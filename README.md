@@ -129,7 +129,7 @@ Every file. Same structure. Production-ready.
 ```bash
 cd Scripts
 python validate_yaml.py
-
+```
 
 Checks:
 - YAML frontmatter presence
