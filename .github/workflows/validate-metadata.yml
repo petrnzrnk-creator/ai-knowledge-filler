@@ -1,60 +1,28 @@
-name: Validate Knowledge Files
+name: Validate Metadata
 
 on:
   push:
-    paths:
-      - '**.md'
+    branches: [ main ]
   pull_request:
-    paths:
-      - '**.md'
+    branches: [ main ]
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
       
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          pip install pyyaml
-      
-      - name: Validate YAML metadata
-        run: |
-          python Validation/validate_yaml.py
-        continue-on-error: true
-      
-      - name: Check for required fields
-        run: |
-          echo "Checking for required YAML fields..."
-          fail=0
-          for file in $(find . -name "*.md" -not -path "./.github/*" -not -path "./node_modules/*"); do
-            if ! grep -q "^title:" "$file"; then
-              echo "❌ Missing 'title' in $file"
-              fail=1
-            fi
-            if ! grep -q "^type:" "$file"; then
-              echo "❌ Missing 'type' in $file"
-              fail=1
-            fi
-            if ! grep -q "^domain:" "$file"; then
-              echo "❌ Missing 'domain' in $file"
-              fail=1
-            fi
-          done
-          if [ $fail -eq 1 ]; then
-            echo "Validation failed. Please fix the errors above."
-            exit 1
-          fi
-          echo "✅ All files have required fields"
-      
-      - name: Report results
-        if: always()
-        run: |
-          echo "Validation complete. Check logs above for any issues."
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyyaml
+        
+    - name: Run YAML validator
+      run: python Scripts/validate_yaml.py
