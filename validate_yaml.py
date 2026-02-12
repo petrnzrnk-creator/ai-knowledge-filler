@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
-"""
-YAML Metadata Validator for AI Knowledge Filler
+"""YAML Metadata Validator for AI Knowledge Filler.
 
-Validates Markdown files against Metadata_Template_Standard.
+This module validates Markdown files against the Metadata_Template_Standard,
+checking for proper YAML frontmatter, required fields, and valid enum values.
+
+Example:
+    Run validation on all Markdown files in the repository:
+
+        $ python validate_yaml.py
+
+Exit codes:
+    0: All files valid
+    1: One or more files have validation errors
 """
 
 import yaml
@@ -26,7 +35,7 @@ VALID_TYPES: List[str] = [
 VALID_LEVELS: List[str] = ["beginner", "intermediate", "advanced"]
 VALID_STATUSES: List[str] = ["draft", "active", "completed", "archived"]
 
-# Valid domains (add more as needed)
+# Valid domains
 VALID_DOMAINS: List[str] = [
     "ai-system",
     "system-design",
@@ -51,13 +60,19 @@ VALID_DOMAINS: List[str] = [
 
 
 def validate_date_format(date_str: Any) -> bool:
-    """Validate ISO 8601 date format (YYYY-MM-DD).
+    """Validate date string against ISO 8601 format (YYYY-MM-DD).
 
     Args:
-        date_str: Date string to validate
+        date_str: Date string to validate. Can be any type, will be converted to string.
 
     Returns:
-        True if valid, False otherwise
+        True if date string matches YYYY-MM-DD format, False otherwise.
+
+    Example:
+        >>> validate_date_format('2025-02-12')
+        True
+        >>> validate_date_format('02-12-2025')
+        False
     """
     try:
         datetime.strptime(str(date_str), "%Y-%m-%d")
@@ -67,13 +82,28 @@ def validate_date_format(date_str: Any) -> bool:
 
 
 def validate_file(filepath: str) -> Tuple[List[str], List[str]]:
-    """Validate single Markdown file.
+    """Validate a single Markdown file's YAML metadata.
+
+    Checks for:
+        - YAML frontmatter presence
+        - Required metadata fields
+        - Valid enum values (type, level, status)
+        - Proper domain classification
+        - Date format compliance
+        - Tag and related fields structure
 
     Args:
-        filepath: Path to file to validate
+        filepath: Path to the Markdown file to validate.
 
     Returns:
-        Tuple of (errors, warnings)
+        A tuple of (errors, warnings):
+            - errors: List of validation errors (blocking issues)
+            - warnings: List of warnings (non-blocking suggestions)
+
+    Example:
+        >>> errors, warnings = validate_file('example.md')
+        >>> if not errors:
+        ...     print('File is valid')
     """
     errors: List[str] = []
     warnings: List[str] = []
@@ -114,19 +144,20 @@ def validate_file(filepath: str) -> Tuple[List[str], List[str]]:
         # Validate type
         if "type" in metadata and metadata["type"] not in VALID_TYPES:
             errors.append(
-                f"Invalid type: {metadata['type']}. Must be one of: {', '.join(VALID_TYPES)}"
+                f"Invalid type: {metadata['type']}. " f"Must be one of: {', '.join(VALID_TYPES)}"
             )
 
         # Validate level
         if "level" in metadata and metadata["level"] not in VALID_LEVELS:
             errors.append(
-                f"Invalid level: {metadata['level']}. Must be one of: {', '.join(VALID_LEVELS)}"
+                f"Invalid level: {metadata['level']}. " f"Must be one of: {', '.join(VALID_LEVELS)}"
             )
 
         # Validate status
         if "status" in metadata and metadata["status"] not in VALID_STATUSES:
             errors.append(
-                f"Invalid status: {metadata['status']}. Must be one of: {', '.join(VALID_STATUSES)}"
+                f"Invalid status: {metadata['status']}. "
+                f"Must be one of: {', '.join(VALID_STATUSES)}"
             )
 
         # Validate domain
@@ -165,7 +196,21 @@ def validate_file(filepath: str) -> Tuple[List[str], List[str]]:
 
 
 def main() -> None:
-    """Validate all Markdown files in repository."""
+    """Run validation on all Markdown files in the repository.
+
+    Scans the current directory recursively for .md files (excluding
+    .github, README.md, and CONTRIBUTING.md), validates each file's
+    metadata, and reports results.
+
+    Prints validation summary and exits with appropriate code:
+        - Exit 0: All files valid
+        - Exit 1: One or more files have errors
+
+    Output includes:
+        - Per-file validation status (✅/⚠️/❌)
+        - Detailed error and warning messages
+        - Summary statistics
+    """
     print("🔍 AI Knowledge Filler - YAML Metadata Validator\n")
 
     all_files: List[str] = glob.glob("**/*.md", recursive=True)
