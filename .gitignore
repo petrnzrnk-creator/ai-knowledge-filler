@@ -31,3 +31,14 @@ Thumbs.db
 PERSONAL_*.md
 SCRATCH.md
 TODO_PRIVATE.md
+
+# Obsidian
+.obsidian/
+.trash/
+
+# Temporary/Workflow files
+*✅*.md
+*🚀*.md
+*⚠️*.md
+*⏪*.md
+*🎉*.md
