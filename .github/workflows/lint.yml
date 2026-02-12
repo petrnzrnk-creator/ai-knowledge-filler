@@ -1,0 +1,54 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-lint-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-lint-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black pylint
+        pip install -r requirements.txt
+    
+    - name: Check code formatting with Black
+      run: |
+        echo "Checking Python code formatting..."
+        black --check --diff Scripts/ tests/
+      continue-on-error: true
+    
+    - name: Lint with flake8
+      run: |
+        echo "Running flake8 linter..."
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 Scripts/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 Scripts/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+    
+    - name: Lint with pylint
+      run: |
+        echo "Running pylint..."
+        pylint Scripts/ --exit-zero --max-line-length=120 --disable=C0111,R0903,C0103
+      continue-on-error: true
