@@ -6,7 +6,7 @@ Thank you for your interest in contributing!
 
 ### 1. Fork the Repository
 ```bash
-git clone https://github.com/yourusername/ai-knowledge-filler.git
+git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
 cd ai-knowledge-filler
 ```
 
