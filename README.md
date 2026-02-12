@@ -520,3 +520,5 @@ Transform: "AI helps write notes" → "AI compiles my knowledge base"
 
 **Quick Links:**
 [Installation](#-quick-start) | [Documentation](#-documentation) | [Examples](#-example-output) | [Contributing](#-contributing) | [Support](#-support)
+
+[![Pylint](https://img.shields.io/badge/pylint-9.0%2B-brightgreen)](https://github.com/petrnzrnk-creator/ai-knowledge-filler)

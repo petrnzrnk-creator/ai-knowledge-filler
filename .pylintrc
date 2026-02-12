@@ -1,0 +1,61 @@
+[MASTER]
+# Use multiple processes for faster analysis
+jobs=4
+
+# Python version
+py-version=3.11
+
+# Ignore patterns
+ignore=CVS,.git,__pycache__,.mypy_cache,.pytest_cache
+
+[MESSAGES CONTROL]
+# Disable specific warnings
+disable=
+    C0111,  # missing-docstring (handled by pydocstyle)
+    R0903,  # too-few-public-methods
+    R0913,  # too-many-arguments
+    W0511,  # fixme (TODO comments are ok)
+    C0103,  # invalid-name (sometimes needed)
+
+[REPORTS]
+# Output format
+output-format=colorized
+
+# Score display
+score=yes
+
+[FORMAT]
+# Maximum line length (same as Black)
+max-line-length=100
+
+# String quote preference
+string-quote=double-quote-or-single-quote
+
+[BASIC]
+# Good variable names
+good-names=i,j,k,f,_,id,db
+
+# Allow short names for common patterns
+argument-rgx=[a-z_][a-z0-9_]{1,30}$
+variable-rgx=[a-z_][a-z0-9_]{1,30}$
+
+[DESIGN]
+# Complexity thresholds
+max-args=7
+max-locals=15
+max-returns=6
+max-branches=12
+max-statements=50
+max-attributes=10
+
+[SIMILARITIES]
+# Minimum lines for duplicate code detection
+min-similarity-lines=4
+
+[TYPECHECK]
+# Members that Pylint should not check
+ignored-modules=yaml
+
+[IMPORTS]
+# Import order checking (handled by isort/black)
+allow-wildcard-with-all=no
