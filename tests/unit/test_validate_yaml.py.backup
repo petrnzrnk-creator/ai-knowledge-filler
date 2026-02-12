@@ -27,8 +27,8 @@ class TestDateValidation:
     
     def test_invalid_date_value(self):
         """Test that invalid date values fail"""
-        assert validate_date_format('2026-13-01') == False
-        assert validate_date_format('2026-02-30') == False
+        assert validate_date_format('2026-13-01') == False  # Invalid month
+        assert validate_date_format('2026-02-30') == False  # Invalid day for Feb
     
     def test_invalid_date_feb_30(self):
         """Test that February 30 is invalid"""
@@ -101,6 +101,9 @@ updated: 2026-02-10
             assert any('Missing required field: title' in err for err in errors)
         finally:
             os.unlink(temp_path)
+
+
+# ==================== NEW TESTS BELOW ====================
 
 
 class TestMetadataFieldValidation:
@@ -202,7 +205,7 @@ updated: 2026-02-10
         
         try:
             errors, warnings = validate_file(temp_path)
-            assert len(errors) == 0
+            assert len(errors) == 0  # No errors, just warning
             assert any('not in standard taxonomy' in warn for warn in warnings)
         finally:
             os.unlink(temp_path)
@@ -309,56 +312,6 @@ updated: 2026-02-10
             assert any('No related links' in warn for warn in warnings)
         finally:
             os.unlink(temp_path)
-    
-    def test_created_date_invalid_format(self):
-        """Test invalid created date format"""
-        content = """---
-title: "Test File"
-type: guide
-domain: ai-system
-level: intermediate
-status: active
-tags: [tag1, tag2, tag3]
-created: 10-02-2026
-updated: 2026-02-10
----
-
-# Content
-"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            f.write(content)
-            temp_path = f.name
-        
-        try:
-            errors, warnings = validate_file(temp_path)
-            assert any('Invalid created date format' in err for err in errors)
-        finally:
-            os.unlink(temp_path)
-
-    def test_updated_date_invalid_format(self):
-        """Test invalid updated date format"""
-        content = """---
-title: "Test File"
-type: guide
-domain: ai-system
-level: intermediate
-status: active
-tags: [tag1, tag2, tag3]
-created: 2026-02-10
-updated: 10/02/2026
----
-
-# Content
-"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            f.write(content)
-            temp_path = f.name
-        
-        try:
-            errors, warnings = validate_file(temp_path)
-            assert any('Invalid updated date format' in err for err in errors)
-        finally:
-            os.unlink(temp_path)
 
 
 class TestYAMLParsingErrors:
@@ -418,9 +371,7 @@ type: guide
         
         try:
             errors, warnings = validate_file(temp_path)
-            assert len(errors) > 0
-            assert any('Invalid YAML frontmatter structure' in err for err in errors) or \
-                   any('Missing required field' in err for err in errors)
+            assert any('Invalid YAML frontmatter structure' in err for err in errors)
         finally:
             os.unlink(temp_path)
 
@@ -443,6 +394,7 @@ type: guide
         
         try:
             errors, warnings = validate_file(temp_path)
+            # Should have errors for missing: domain, level, status, created, updated
             assert len(errors) >= 5
             assert any('Missing required field: domain' in err for err in errors)
             assert any('Missing required field: level' in err for err in errors)
@@ -471,6 +423,7 @@ updated: 2026-02-10
         
         try:
             errors, warnings = validate_file(temp_path)
+            # Should have multiple errors
             assert len(errors) >= 4
             assert any('Invalid type' in err for err in errors)
             assert any('Invalid level' in err for err in errors)
