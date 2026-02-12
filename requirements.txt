@@ -7,3 +7,4 @@ black>=24.0.0
 black>=24.0.0
 pydocstyle>=6.3.0
 pylint>=3.0.0
+mypy>=1.8.0
