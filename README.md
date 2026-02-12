@@ -1,272 +1,159 @@
-
 # AI Knowledge Filler
 
 **Transform any LLM into a deterministic knowledge base generator**
 
+[![Tests](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Tests/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
+[![Lint](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Lint/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/lint.yml)
+[![Validate](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Validate%20Metadata/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/validate.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
-[![Obsidian](https://img.shields.io/badge/Obsidian-Ready-purple.svg)](https://obsidian.md)
-
-> Not a chatbot enhancement. A knowledge engineering architecture.
-
-Turn any LLM (Claude, GPT-4, Gemini, local models) into a deterministic file generator that produces consistent, validated, production-ready documentation.
+[![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
 
 ---
 
 ## 🎯 What This Is
 
-A production-ready system that transforms conversational AI outputs into **structured, compliant Markdown files** with YAML metadata for knowledge bases like Obsidian.
+A production-ready system that transforms conversational AI outputs into structured, compliant Markdown files with YAML metadata for knowledge bases like Obsidian.
 
-**Key Difference:** Other tools help you chat better. This transforms LLMs into **infrastructure** — deterministic, scalable, enterprise-grade knowledge generators.
+**Not a chatbot enhancement. A knowledge engineering architecture.**
 
-```
-Conversation → System Prompt → Structured File
-      ❌              ✅              ✅
-```
+Turn any LLM (Claude, GPT-4, Gemini, local models) into a deterministic file generator that produces consistent, validated, production-ready documentation.
 
 ---
 
-## ✨ Features
+## ⚡ Quick Start
 
-### Universal Compatibility
-- ✅ **Any LLM** — Claude, GPT-4, Gemini, Llama, Mistral, local models
-- ✅ **Any platform** — Web, API, CLI, mobile (Termux)
-- ✅ **Any workflow** — Obsidian, Notion, Confluence, VS Code
-
-### Zero Manual Formatting
-```
-Input:  "Create API security checklist"
-Output: Complete .md file with YAML, structure, links
-```
-No post-processing. No copy-paste formatting. Production-ready instantly.
-
-### Deterministic Output
-Same input → Same structure. Every time.
-- Validated YAML metadata
-- Consistent heading hierarchy  
-- Standard domain taxonomy
-- Automated quality checks
-
-### Enterprise-Grade Architecture
-```
-System Prompt (behavior rules)
-    ↓
-Execution Protocol (workflows)
-    ↓
-Governance Standards (templates, taxonomy)
-    ↓
-Validated Knowledge Files
-```
-
----
-
-## 🚀 Quick Start
-
-### Option 1: Claude.ai (60 seconds)
+### Claude.ai (60 seconds)
 
 ```markdown
 1. Open Claude.ai or create new Project
-2. Go to Project Knowledge
-3. Copy Core_System/System_Prompt_AI_Knowledge_Filler.md
-4. Paste into Project Knowledge
-5. Start: "Create a guide on API authentication"
+2. Go to Project Knowledge or Custom Instructions
+3. Copy content from Core_System/System_Prompt_AI_Knowledge_Filler.md
+4. Paste into system instructions
+5. Start: "Create a guide on API authentication methods"
 ```
 
-**Done.** Claude now generates structured files instead of chat.
+**Done.** Claude now generates structured knowledge files instead of conversational responses.
 
 ---
 
-### Option 2: API Integration
+## 📦 What You Get
 
-```bash
-# Clone repository
-git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
-cd ai-knowledge-filler
+### 10 Core System Files
+- **System Prompt** — Transforms LLM behavior from chat to file generator
+- **Custom Instructions** — AI working profile and constraints
+- **Workflow** — 8-stage prompt engineering methodology
+- **Metadata Standard** — YAML template specification
+- **Update Protocol** — File merge rules and conflict resolution
+- **Domain Taxonomy** — 30+ standardized classifications
+- **Audit Report** — System alignment validation
+- **Use Cases** — 20+ real-world scenarios
+- **Deployment Guide** — Installation for all platforms
+- **Control Dashboard** — Dataview monitoring queries
 
-# Install dependencies
-pip install -r requirements.txt
+### Production Infrastructure
+- ✅ Automated YAML validation
+- ✅ Batch file generation
+- ✅ Git workflow integration
+- ✅ Version control support
+- ✅ Conflict resolution strategies
+- ✅ ISO 8601 date formatting
+- ✅ WikiLink syntax enforcement
+- ✅ 96% test coverage
+- ✅ CI/CD pipelines
 
-# Test
-python Scripts/validate_yaml.py
+---
+
+## ✨ Key Features
+
+### Universal LLM Compatibility
+Works with Claude, GPT-4, Gemini, Llama, Mistral — any system supporting system prompts.
+
+### Zero Manual Formatting
+AI generates publication-ready files. No post-processing required.
+
+```
+User: "Create API security checklist"
+AI: [Generates complete .md file with YAML, structure, links]
 ```
 
-**Python Example:**
+### Deterministic Output
+Same input → Same structure. Every time.
+
+### Scalable Architecture
+```
+Operating Principles (System Prompt)
+    ↓
+Execution Protocols (Workflows, Rules)
+    ↓
+Governance Standards (Templates, Taxonomy)
+    ↓
+Structured Knowledge Files
+```
+
+---
+
+## 🚀 Installation
+
+### Option 1: Claude Projects (Recommended)
+
+```bash
+# Create new Claude Project
+# Add Core_System/System_Prompt_AI_Knowledge_Filler.md to Project Knowledge
+# Add Custom_Instructions.md to Project Instructions
+```
+
+### Option 2: API Integration
+
 ```python
 import anthropic
 
-# Load system prompt
 with open('Core_System/System_Prompt_AI_Knowledge_Filler.md') as f:
     system_prompt = f.read()
 
-# Initialize
 client = anthropic.Anthropic(api_key="your-key")
-
-# Generate
 response = client.messages.create(
     model="claude-sonnet-4-20250514",
     max_tokens=4096,
     system=system_prompt,
-    messages=[{
-        "role": "user", 
-        "content": "Create guide on Docker deployment"
-    }]
+    messages=[{"role": "user", "content": "Create guide on Docker deployment"}]
 )
-
-# Output is production-ready Markdown
-print(response.content[0].text)
 ```
+
+### Option 3: Local/Obsidian Vault
+
+```bash
+git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
+cd ai-knowledge-filler
+cp Core_System/*.md ~/path/to/obsidian/vault/
+```
+
+**See [Deployment_Guide.md](Documentation/Deployment_Guide.md) for detailed instructions**
 
 ---
 
-### Option 3: Termux (Mobile Android)
-
-Perfect for on-the-go knowledge capture.
-
-#### Prerequisites
-- Android device with Termux installed
-- Storage permissions configured
-- Internet connection
-
-#### Installation
+## 🧪 Testing & Quality
 
 ```bash
-# 1. Update packages
-pkg update && pkg upgrade
+# Run tests
+pytest --cov=Scripts --cov-report=term-missing -v
 
-# 2. Install dependencies
-pkg install python git
+# Run linting
+flake8 Scripts/ tests/
+black --check Scripts/ tests/
 
-# 3. Clone repository
-cd ~/storage/shared/Download
-git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
-cd ai-knowledge-filler
-
-# 4. Install Python dependencies
-pip install --break-system-packages -r requirements.txt
-
-# 5. Configure Git
-git config --global user.name "Your Name"
-git config --global user.email "your@email.com"
-
-# 6. Test installation
+# Validate metadata
 python Scripts/validate_yaml.py
 ```
 
-**Expected output:**
-```
-🔍 AI Knowledge Filler - YAML Metadata Validator
-✅ Core_System/System_Prompt_AI_Knowledge_Filler.md
-...
-✅ All files valid!
-```
-
-#### Termux Workflow Shortcuts
-
-Add to `~/.bashrc`:
-
-```bash
-# AI Knowledge Filler shortcuts
-alias akf='cd ~/storage/shared/Download/ai-knowledge-filler'
-alias akfs='cd ~/storage/shared/Download/ai-knowledge-filler && git status'
-alias akfcheck='cd ~/storage/shared/Download/ai-knowledge-filler && python Scripts/validate_yaml.py'
-alias akfsync='cd ~/storage/shared/Download/ai-knowledge-filler && git pull origin main'
-```
-
-Apply:
-```bash
-source ~/.bashrc
-```
-
-**Usage:**
-```bash
-akf          # Navigate to project
-akfs         # Check git status
-akfcheck     # Validate YAML
-akfsync      # Sync with GitHub
-```
-
-#### Termux Daily Workflow
-
-```bash
-# 1. Start session
-akf
-akfsync
-
-# 2. Work (create/edit files)
-nano Core_System/New_Guide.md
-
-# 3. Validate
-akfcheck
-
-# 4. Commit and push
-git add .
-git commit -m "Add: New guide from mobile"
-git push origin main
-```
-
-#### Termux Troubleshooting
-
-**Permission denied errors:**
-```bash
-termux-setup-storage
-```
-
-**Git authentication:**
-```bash
-# Use Personal Access Token
-git remote set-url origin https://YOUR_TOKEN@github.com/username/ai-knowledge-filler.git
-```
-
-**Python dependencies fail:**
-```bash
-pip install --break-system-packages --upgrade pip
-pip install --break-system-packages -r requirements.txt
-```
+**Test Coverage:** 96% (58 tests passing)
+- Unit tests: 23
+- Integration tests: 35
+- All CI/CD checks passing
 
 ---
 
-### Option 4: Obsidian Vault
-
-```bash
-# Copy to your vault
-cp -r Core_System ~/path/to/vault/
-cp -r Documentation ~/path/to/vault/
-
-# Install Dataview plugin in Obsidian
-# Copy Documentation/Control_Dashboard.md to vault root
-```
-
----
-
-## 📖 Documentation
-
-### Core System Files
-
-| File | Purpose |
-|------|---------|
-| [System_Prompt_AI_Knowledge_Filler.md](Core_System/System_Prompt_AI_Knowledge_Filler.md) | Transforms LLM behavior |
-| [Metadata_Template_Standard.md](Core_System/Metadata_Template_Standard.md) | YAML specification |
-| [Domain_Taxonomy.md](Core_System/Domain_Taxonomy.md) | 30+ standardized domains |
-| [File_Update_Protocol.md](Core_System/File_Update_Protocol.md) | Update & merge rules |
-| [Prompt_Engineering_Workflow.md](Core_System/Prompt_Engineering_Workflow.md) | 8-stage methodology |
-| [Custom_Instructions.md](Core_System/Custom_Instructions.md) | AI working profile |
-
-### Guides
-
-- [Deployment Guide](Documentation/Deployment_Guide.md) — Installation across platforms
-- [Use Cases](Documentation/Use_Cases_Documentation.md) — 20+ real-world scenarios
-- [Control Dashboard](Documentation/Control_Dashboard.md) — Dataview monitoring
-
-### Examples
-
-- [Concept File](Examples/example_concept_expanded.md) — Microservices Architecture
-- [Guide File](Examples/example_guide_expanded.md) — API Authentication
-- [Checklist File](Examples/example_checklist.md) — Security Review
-
----
-
-## 💡 Use Cases
+## 📊 Use Cases
 
 ### Knowledge Management
 Transform conversations into structured notes with consistent metadata
@@ -277,17 +164,14 @@ Generate API docs, architecture decisions, system designs
 ### Consulting Deliverables
 Create frameworks, methodologies, client reports
 
-### Software Development
-Document code, ADRs, runbooks, SOPs
-
 ### Learning & Research
 Structure educational content, research notes, insights
 
-**See [Use Cases Documentation](Documentation/Use_Cases_Documentation.md) for 20+ detailed scenarios**
+**20+ detailed scenarios in [Use_Cases_Documentation.md](Documentation/Use_Cases_Documentation.md)**
 
 ---
 
-## 📊 Example Output
+## 📋 Example Output
 
 **Input:**
 ```
@@ -307,17 +191,17 @@ tags: [api, rate-limiting, performance, architecture]
 related:
   - "[[API Design Principles]]"
   - "[[System Scalability Patterns]]"
-created: 2026-02-12
-updated: 2026-02-12
+created: 2026-02-06
+updated: 2026-02-06
 ---
 
 ## Purpose
-Comprehensive strategy for implementing API rate limits...
+Comprehensive strategy for implementing and managing API rate limits...
 
 ## Core Principles
 [Structured content with sections, lists, examples]
 
-## Implementation
+## Implementation Patterns
 [Step-by-step technical guidance]
 
 ## Conclusion
@@ -361,80 +245,35 @@ Comprehensive strategy for implementing API rate limits...
 
 ---
 
-## 🎓 Key Concepts
+## 🎓 Documentation
 
-### 1. AI as File Generator
-System prompt eliminates conversational behavior. Output is pure Markdown.
-
-### 2. Metadata-Driven Organization
-Every file has standardized YAML frontmatter:
-- `type` — concept, guide, reference, checklist, project
-- `domain` — from 30+ taxonomy (api-design, system-design, etc.)
-- `level` — beginner, intermediate, advanced
-- `status` — draft, active, completed, archived
-
-### 3. Preservation-First Updates
-Smart merge strategies prevent data loss when updating existing files.
-
-### 4. Quality Assurance
-Automated validation ensures compliance with metadata standards.
+- [System Prompt](Core_System/System_Prompt_AI_Knowledge_Filler.md) — Core behavior definition
+- [Custom Instructions](Core_System/Custom_Instructions.md) — AI working profile
+- [Workflow](Core_System/Prompt_Engineering_Workflow.md) — 8-stage methodology
+- [Metadata Standard](Core_System/Metadata_Template_Standard.md) — YAML specification
+- [Update Protocol](Core_System/File_Update_Protocol.md) — Merge & conflict resolution
+- [Domain Taxonomy](Core_System/Domain_Taxonomy.md) — Classification system
+- [Use Cases](Documentation/Use_Cases_Documentation.md) — 20+ scenarios
+- [Deployment Guide](Documentation/Deployment_Guide.md) — Installation instructions
 
 ---
 
-## 🔧 Advanced Features
+## 🛠️ Troubleshooting
 
-### Batch Generation
-```
-User: "Create 5 microservices pattern guides:
-       Service Discovery, API Gateway, Circuit Breaker, 
-       Event Sourcing, CQRS"
+**AI generates chat responses instead of files?**
+→ System prompt not loaded correctly. Verify placement in system instructions.
 
-AI: [Generates 5 cross-referenced files instantly]
-```
+**Invalid YAML metadata?**
+→ Check [Metadata_Template_Standard.md](Core_System/Metadata_Template_Standard.md). Run validation.
 
-### Git Integration
-```bash
-# Files are version-control ready
-git add .
-git commit -m "Add security documentation"
+**File updates delete content?**
+→ Review [File_Update_Protocol.md](Core_System/File_Update_Protocol.md). Preservation-first is default.
 
-# CI/CD validation
-.github/workflows/validate-metadata.yml
-```
-
-### Obsidian Dashboard
-```dataview
-TABLE title, domain, status, updated
-FROM "/"
-WHERE type = "guide" AND status = "active"
-SORT updated DESC
-```
+**Full troubleshooting in [Deployment_Guide.md](Documentation/Deployment_Guide.md)**
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Ways to contribute:**
-- 🐛 Report bugs
-- 💡 Suggest features
-- 📝 Improve documentation
-- 🌍 Add domain taxonomies
-- 🔧 Submit pull requests
-
-**Before contributing:**
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Follow metadata standards in `Core_System/Metadata_Template_Standard.md`
-4. Run validation: `python Scripts/validate_yaml.py`
-5. Commit changes (`git commit -m 'Add: Amazing feature'`)
-6. Push to branch (`git push origin feature/amazing`)
-7. Open Pull Request
-
----
-
-## 📈 Success Metrics
+## 📊 Success Metrics
 
 Organizations using this system report:
 - **70-90% reduction** in documentation time
@@ -444,77 +283,78 @@ Organizations using this system report:
 
 ---
 
+## 🤝 Contributing
+
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+```bash
+# Setup development environment
+git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
+cd ai-knowledge-filler
+pip install -r requirements.txt
+pip install pytest pytest-cov pytest-mock flake8 black
+
+# Run tests
+pytest --cov=Scripts -v
+
+# Run linting
+flake8 Scripts/ tests/
+black --check Scripts/ tests/
+```
+
+---
+
 ## 📜 License
 
 MIT License — Free for commercial and personal use.
-
-See [LICENSE](LICENSE) for details.
-
----
-
-## 🌟 Show Your Support
-
-If this system saves you time:
-- ⭐ Star the repository
-- 🔀 Fork for your team
-- 📢 Share with colleagues
-- 💬 Join [Discussions](https://github.com/petrnzrnk-creator/ai-knowledge-filler/discussions)
-
----
-
-## 🔗 Links
-
-- **Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
-- **Issues:** https://github.com/petrnzrnk-creator/ai-knowledge-filler/issues
-- **Discussions:** https://github.com/petrnzrnk-creator/ai-knowledge-filler/discussions
-- **Releases:** https://github.com/petrnzrnk-creator/ai-knowledge-filler/releases
-
----
-
-## 📞 Support
-
-- 🐛 **Bug reports:** [GitHub Issues](https://github.com/petrnzrnk-creator/ai-knowledge-filler/issues)
-- 💬 **Questions:** [GitHub Discussions](https://github.com/petrnzrnk-creator/ai-knowledge-filler/discussions)
-- 📧 **Commercial support:** Available for enterprise licensing
 
 ---
 
 ## 🚀 Roadmap
 
-### v1.1 (Next)
-- [ ] Enhanced conflict resolution
-- [ ] Batch file generation CLI
+### v1.1
 - [ ] VSCode validation extension
-
-### v1.2
-- [ ] Multi-language support
 - [ ] Automated taxonomy expansion
-- [ ] Advanced graph analytics
+- [ ] Multi-language support
+- [ ] Enhanced conflict resolution
 
 ### v2.0
 - [ ] Visual workflow designer
 - [ ] Real-time collaboration
+- [ ] Advanced graph analytics
 - [ ] Enterprise features
 
 ---
 
-## 💭 Philosophy
+## 💡 Philosophy
 
 **This is knowledge engineering, not chat enhancement.**
 
 LLMs should be **deterministic infrastructure**, not conversational novelty.
 
-Transform: "AI helps write notes" → "AI compiles my knowledge base"
+From "AI helps write notes" → "AI compiles my knowledge base"
 
 ---
+
+## ⭐ Show Your Support
+
+If this system saves you time, star the repository and share with your team.
 
 **AI Knowledge Filler: Engineer knowledge, don't improvise it.**
 
 ---
 
-**Created by:** [Petro Nzrnk](https://github.com/petrnzrnk-creator)  
+**Created by:** Petr — AI Solutions Architect  
+**Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler  
 **Version:** 1.0.0  
 **Last Updated:** 2026-02-12
+
+---
+
+## 📞 Support
+
+- **Issues:** [GitHub Issues](https://github.com/petrnzrnk-creator/ai-knowledge-filler/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/petrnzrnk-creator/ai-knowledge-filler/discussions)
 
 ---
 

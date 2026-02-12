@@ -1,0 +1,93 @@
+name: Validate Metadata
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-validate-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-validate-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Check for YAML frontmatter
+      run: |
+        echo "Checking all markdown files have YAML frontmatter..."
+        files_without_yaml=$(find . -name "*.md" \
+          ! -path "./.github/*" \
+          ! -name "README.md" \
+          ! -name "CONTRIBUTING.md" \
+          ! -name "DEPLOYMENT_READY.md" \
+          ! -name "__ЧЕКЛИСТ_НЕОБХОДИМЫХ_УЛУЧШЕНИЙ.md" \
+          -exec grep -L "^---$" {} \; || true)
+        
+        if [ -n "$files_without_yaml" ]; then
+          echo "❌ Files missing YAML frontmatter:"
+          echo "$files_without_yaml"
+          exit 1
+        else
+          echo "✅ All markdown files have YAML frontmatter"
+        fi
+    
+    - name: Validate YAML metadata
+      run: |
+        echo "Running YAML validator..."
+        python Scripts/validate_yaml.py
+    
+    - name: Check required metadata fields
+      run: |
+        echo "Checking required metadata fields..."
+        
+        total_md=$(find . -name "*.md" \
+          ! -path "./.github/*" \
+          ! -name "README.md" \
+          ! -name "CONTRIBUTING.md" \
+          ! -name "DEPLOYMENT_READY.md" \
+          ! -name "__ЧЕКЛИСТ_НЕОБХОДИМЫХ_УЛУЧШЕНИЙ.md" | wc -l)
+        
+        echo "Found $total_md markdown files to validate"
+        
+        # Count files with required fields
+        files_with_title=$(grep -r "^title:" --include="*.md" \
+          --exclude-dir=.github \
+          --exclude=README.md \
+          --exclude=CONTRIBUTING.md \
+          --exclude=DEPLOYMENT_READY.md \
+          --exclude=__ЧЕКЛИСТ_НЕОБХОДИМЫХ_УЛУЧШЕНИЙ.md \
+          . | wc -l)
+        
+        echo "Files with 'title' field: $files_with_title"
+        
+        if [ "$files_with_title" -lt "$total_md" ]; then
+          echo "⚠️  Some files missing 'title' field"
+        else
+          echo "✅ All files have 'title' field"
+        fi
+    
+    - name: Validation summary
+      run: |
+        echo "=========================================="
+        echo "✅ YAML Metadata Validation Complete"
+        echo "=========================================="
