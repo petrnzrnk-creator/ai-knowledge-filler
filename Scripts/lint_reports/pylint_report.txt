@@ -1,0 +1,10 @@
+************* Module validate_yaml
+validate_yaml.py:290:0: C0304: Final newline missing (missing-final-newline)
+validate_yaml.py:211:11: W0718: Catching too general exception Exception (broad-exception-caught)
+validate_yaml.py:91:0: R0912: Too many branches (19/12) (too-many-branches)
+validate_yaml.py:275:10: W1309: Using an f-string that does not have any interpolated variables (f-string-without-interpolation)
+validate_yaml.py:26:0: W0611: Unused Path imported from pathlib (unused-import)
+
+------------------------------------------------------------------
+Your code has been rated at 9.49/10 (previous run: 9.49/10, +0.00)
+

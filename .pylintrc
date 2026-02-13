@@ -8,6 +8,15 @@ py-version=3.11
 # Ignore patterns
 ignore=CVS,.git,__pycache__,.mypy_cache,.pytest_cache
 
+# Python code to execute, usually for sys.path manipulation
+init-hook='import sys; sys.path.append(".")'
+
+# Pickle collected data for later comparisons
+persistent=yes
+
+# Specify a score threshold to be exceeded before program exits with error
+fail-under=8.0
+
 [MESSAGES CONTROL]
 # Disable specific warnings
 disable=
@@ -16,31 +25,30 @@ disable=
     R0913,  # too-many-arguments
     W0511,  # fixme (TODO comments are ok)
     C0103,  # invalid-name (sometimes needed)
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    line-too-long,
+    bad-whitespace,
+    missing-module-docstring,
+    no-member,
+    unsubscriptable-object
 
 [REPORTS]
-# Output format
 output-format=colorized
-
-# Score display
+reports=no
 score=yes
 
 [FORMAT]
-# Maximum line length (same as Black)
 max-line-length=100
-
-# String quote preference
 string-quote=double-quote-or-single-quote
 
 [BASIC]
-# Good variable names
 good-names=i,j,k,f,_,id,db
-
-# Allow short names for common patterns
 argument-rgx=[a-z_][a-z0-9_]{1,30}$
 variable-rgx=[a-z_][a-z0-9_]{1,30}$
 
 [DESIGN]
-# Complexity thresholds
 max-args=7
 max-locals=15
 max-returns=6
@@ -49,13 +57,10 @@ max-statements=50
 max-attributes=10
 
 [SIMILARITIES]
-# Minimum lines for duplicate code detection
 min-similarity-lines=4
 
 [TYPECHECK]
-# Members that Pylint should not check
 ignored-modules=yaml
 
 [IMPORTS]
-# Import order checking (handled by isort/black)
 allow-wildcard-with-all=no

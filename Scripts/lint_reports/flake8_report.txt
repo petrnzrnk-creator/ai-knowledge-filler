@@ -1,0 +1,65 @@
+validate_yaml.py:26:1: F401 'pathlib.Path' imported but unused
+from pathlib import Path
+^
+validate_yaml.py:91:1: C901 'validate_file' is too complex (22)
+def validate_file(filepath: str) -> Tuple[List[str], List[str]]:
+^
+validate_yaml.py:230:1: W293 blank line contains whitespace
+    """Execute validation on all Markdown files in the repository.
+
+    Scans for .md files recursively, excludes system files (README, .github),
+    validates each file, and outputs results with color-coded status indicators.
+
+    Exit codes:
+        0: All files valid
+        1: One or more files have validation errors
+
+    Example:
+        >>> main()
+        🔍 AI Knowledge Filler - YAML Metadata Validator
+        
+        ✅ example.md
+        ❌ invalid.md
+           ERROR: Missing required field: title
+        
+        📊 Validation Summary:
+           Total files: 2
+           ✅ Valid: 1
+           ❌ Errors: 1
+    """
+^
+validate_yaml.py:234:1: W293 blank line contains whitespace
+    """Execute validation on all Markdown files in the repository.
+
+    Scans for .md files recursively, excludes system files (README, .github),
+    validates each file, and outputs results with color-coded status indicators.
+
+    Exit codes:
+        0: All files valid
+        1: One or more files have validation errors
+
+    Example:
+        >>> main()
+        🔍 AI Knowledge Filler - YAML Metadata Validator
+        
+        ✅ example.md
+        ❌ invalid.md
+           ERROR: Missing required field: title
+        
+        📊 Validation Summary:
+           Total files: 2
+           ✅ Valid: 1
+           ❌ Errors: 1
+    """
+^
+validate_yaml.py:275:11: F541 f-string is missing placeholders
+    print(f"\n📊 Validation Summary:")
+          ^
+validate_yaml.py:290:11: W292 no newline at end of file
+    main()          ^
+1     C901 'validate_file' is too complex (22)
+1     F401 'pathlib.Path' imported but unused
+1     F541 f-string is missing placeholders
+1     W292 no newline at end of file
+2     W293 blank line contains whitespace
+6
