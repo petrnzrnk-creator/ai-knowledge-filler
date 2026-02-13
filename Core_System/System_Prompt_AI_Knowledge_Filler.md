@@ -1,11 +1,15 @@
 ---
-title: "System Prompt — AI Knowledge Filler & Tutor"
+title: System Prompt — AI Knowledge Filler & Tutor
 type: reference
 domain: ai-system
 level: advanced
 status: active
-version: v2.2
-tags: [system-prompt, ai, obsidian, knowledge-base]
+version: v2.3
+tags:
+  - system-prompt
+  - ai
+  - obsidian
+  - knowledge-base
 related:
   - "[[Custom_Instructions]]"
   - "[[Metadata_Template_Standard]]"
@@ -13,7 +17,7 @@ related:
   - "[[File_Update_Protocol]]"
   - "[[Prompt_Engineering_Workflow]]"
 created: 2026-02-06
-updated: 2026-02-10
+updated: 2026-02-13
 ---
 
 ## ROLE
@@ -58,8 +62,8 @@ status: "<draft | active | completed | archived>"
 version: "<optional: v1.0>"
 tags: [tag1, tag2, tag3]
 related:
-  - [[Related note 1]]
-  - [[Related note 2]]
+  - "[[Related note 1]]"
+  - "I[[Related note 2]]"
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 ---
@@ -274,9 +278,9 @@ level: intermediate
 status: active
 tags: [microservices, architecture, distributed-systems, scalability]
 related:
-  - [[Monolithic Architecture]]
-  - [[Service Discovery Patterns]]
-  - [[API Gateway]]
+  - "[[Monolithic Architecture]]"
+  - "[[Service Discovery Patterns]]"
+  - "[[API Gateway]]"
 created: 2026-02-06
 updated: 2026-02-06
 ---
@@ -339,9 +343,9 @@ status: active
 version: v1.0
 tags: [docker, containerization, optimization, build]
 related:
-  - [[Docker Basics]]
-  - [[Container Security]]
-  - [[CI/CD Pipelines]]
+  - "[[Docker Basics]]"
+  - "[[Container Security]]"
+  - "[[CI/CD Pipelines]]"
 created: 2026-02-06
 updated: 2026-02-06
 ---
@@ -461,9 +465,9 @@ level: intermediate
 status: active
 tags: [security, api, checklist, review]
 related:
-  - [[API Design Principles]]
-  - [[OAuth Implementation]]
-  - [[Security Best Practices]]
+  - "[[API Design Principles]]"
+  - "[[OAuth Implementation]]"
+  - "[[Security Best Practices]]"
 created: 2026-02-06
 updated: 2026-02-06
 ---
@@ -557,9 +561,9 @@ status: active
 version: v1.0
 tags: [metadata, yaml, standard, template]
 related:
-  - [[System_Prompt_AI_Knowledge_Filler]]
-  - [[Domain_Taxonomy]]
-  - [[File_Update_Protocol]]
+  - "[[System_Prompt_AI_Knowledge_Filler]]"
+  - "[[Domain_Taxonomy]]"
+  - "[[File_Update_Protocol]]"
 created: 2026-02-06
 updated: 2026-02-06
 ---
@@ -580,7 +584,7 @@ status: "<draft | active | completed | archived>"
 version: "<optional: v1.0>"
 tags: [tag1, tag2, tag3]
 related:
-  - [[Related note 1]]
+  - "[[Related note 1]]"
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 ---

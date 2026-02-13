@@ -1,18 +1,23 @@
 ---
-title: "Metadata Template Standard"
+title: Metadata Template Standard
 type: reference
 domain: ai-system
 level: advanced
 status: active
-version: v1.1
-tags: [metadata, yaml, standard, template, obsidian]
+version: v1.2
+tags:
+  - metadata
+  - yaml
+  - standard
+  - template
+  - obsidian
 related:
   - "[[Custom Instructions — AI Working Profile]]"
-  - "[[System_Prompt_AI_Knowledge_Filler]]"
+  - "[[ai-knowledge-filler (copy)/Core_System/System_Prompt_AI_Knowledge_Filler]]"
   - "[[File_Update_Protocol]]"
   - "[[Domain_Taxonomy]]"
 created: 2026-02-06
-updated: 2026-02-11
+updated: 2026-02-13
 ---
 
 ## PURPOSE
@@ -312,7 +317,7 @@ related: "[[Single Link]]"
 
 ## INTEGRATION
 
-### With [[System_Prompt_AI_Knowledge_Filler]]
+### With [[ai-knowledge-filler (copy)/Core_System/System_Prompt_AI_Knowledge_Filler]]
 - Template is enforced in FILE FORMAT section
 - AI always generates compliant YAML
 - Quotes automatically added to related links
