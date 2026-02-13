@@ -42,3 +42,6 @@ TODO_PRIVATE.md
 *⚠️*.md
 *⏪*.md
 *🎉*.md
+htmlcov/
+.coverage
+*.txt
