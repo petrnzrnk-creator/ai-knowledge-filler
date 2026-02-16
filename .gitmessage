@@ -1,0 +1,19 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# Type: feat, fix, docs, style, refactor, test, chore
+# Scope: validator, cli, docs, ci, config (optional)
+# Subject: imperative mood, lowercase, no period, max 50 chars
+#
+# Body: explain WHAT and WHY (not HOW), wrap at 72 chars
+#
+# Footer: issue references, breaking changes
+#
+# Examples:
+# feat(cli): add Gemini provider support
+# fix(validator): load domains from Domain_Taxonomy.md
+# docs: update README with installation steps
+# chore(deps): bump pytest to 8.0.2
