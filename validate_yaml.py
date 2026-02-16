@@ -219,14 +219,12 @@ def _validate_enum_fields(
     """
     if "type" in metadata and metadata["type"] not in VALID_TYPES:
         errors.append(
-            f"Invalid type: '{metadata['type']}'. "
-            f"Must be one of: {', '.join(VALID_TYPES)}"
+            f"Invalid type: '{metadata['type']}'. " f"Must be one of: {', '.join(VALID_TYPES)}"
         )
 
     if "level" in metadata and metadata["level"] not in VALID_LEVELS:
         errors.append(
-            f"Invalid level: '{metadata['level']}'. "
-            f"Must be one of: {', '.join(VALID_LEVELS)}"
+            f"Invalid level: '{metadata['level']}'. " f"Must be one of: {', '.join(VALID_LEVELS)}"
         )
 
     if "status" in metadata and metadata["status"] not in VALID_STATUSES:
@@ -251,19 +249,13 @@ def _validate_dates(metadata: dict, errors: List[str]) -> None:
         errors: List to append critical errors to.
     """
     if "created" in metadata and not validate_date_format(metadata["created"]):
-        errors.append(
-            f"Invalid created date format: '{metadata['created']}'. Use YYYY-MM-DD"
-        )
+        errors.append(f"Invalid created date format: '{metadata['created']}'. Use YYYY-MM-DD")
 
     if "updated" in metadata and not validate_date_format(metadata["updated"]):
-        errors.append(
-            f"Invalid updated date format: '{metadata['updated']}'. Use YYYY-MM-DD"
-        )
+        errors.append(f"Invalid updated date format: '{metadata['updated']}'. Use YYYY-MM-DD")
 
 
-def _validate_arrays(
-    metadata: dict, errors: List[str], warnings: List[str]
-) -> None:
+def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> None:
     """Validate tags and related array fields.
 
     Args:
@@ -278,14 +270,8 @@ def _validate_arrays(
         if not isinstance(metadata["related"], list):
             errors.append("'related' must be an array or null")
 
-    if (
-        "tags" in metadata
-        and isinstance(metadata["tags"], list)
-        and len(metadata["tags"]) < 3
-    ):
-        warnings.append(
-            f"Only {len(metadata['tags'])} tag(s) found (recommended: 3-10)"
-        )
+    if "tags" in metadata and isinstance(metadata["tags"], list) and len(metadata["tags"]) < 3:
+        warnings.append(f"Only {len(metadata['tags'])} tag(s) found (recommended: 3-10)")
 
     if not metadata.get("related"):
         warnings.append("No related links — recommended for knowledge graph connectivity")
@@ -359,9 +345,7 @@ def validate_file(
         if parse_errors:
             return parse_errors, []
 
-        required_fields = [
-            "title", "type", "domain", "level", "status", "created", "updated"
-        ]
+        required_fields = ["title", "type", "domain", "level", "status", "created", "updated"]
         for field in required_fields:
             if field not in metadata:
                 errors.append(f"Missing required field: '{field}'")
@@ -410,9 +394,7 @@ def main() -> None:
 
     all_files = glob.glob("**/*.md", recursive=True)
     md_files = [
-        f
-        for f in all_files
-        if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md"])
+        f for f in all_files if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md"])
     ]
 
     total_files = len(md_files)
