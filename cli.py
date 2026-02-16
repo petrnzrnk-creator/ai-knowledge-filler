@@ -171,7 +171,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
 # ─── ENTRY POINT ──────────────────────────────────────────────────────────────
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(prog="akf")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -187,6 +187,7 @@ def main():
         cmd_generate(args)
     elif args.command == "validate":
         cmd_validate(args)
+    return 0
 
 
 if __name__ == "__main__":
