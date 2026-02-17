@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AKF CLI — AI Knowledge Filler (Gemini 3 Flash Edition)
+AKF CLI — AI Knowledge Filler (Multi-LLM Edition)
 """
 
 import sys
@@ -9,6 +9,7 @@ import re
 import argparse
 from datetime import datetime
 from pathlib import Path
+from llm_providers import get_provider, list_providers, PROVIDERS
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 
@@ -124,48 +125,64 @@ def save_file(content: str, filename: str, output_dir: Path) -> Path:
 
 
 def cmd_generate(args: argparse.Namespace) -> None:
+    """Generate knowledge file using selected LLM provider."""
+    # Get provider
     try:
-        from google import genai
-        from google.genai import types
-    except ImportError:
-        err("google-genai not installed. Run: pip install google-genai")
-        sys.exit(1)
-
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        err("GOOGLE_API_KEY is not set.")
+        provider = get_provider(args.model)
+    except ValueError as e:
+        err(str(e))
         sys.exit(1)
 
     system_prompt = load_system_prompt()
-    info(f'Sending to Gemini 3 Flash: "{args.prompt}"')
+    info(f'Generating via {provider.display_name}...')
 
+    # Generate content
     try:
-        # Использование нового клиента Client (v1 SDK)
-        client = genai.Client(api_key=api_key)
-
-        # Модель gemini-3-flash-preview — самая мощная для кода и знаний в 2026 году
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=args.prompt,
-            config=types.GenerateContentConfig(system_instruction=system_prompt, temperature=0.7),
-        )
-        content = response.text
+        content = provider.generate(args.prompt, system_prompt)
     except Exception as e:
-        err(f"Gemini API error: {e}")
+        err(f"Generation error: {e}")
         sys.exit(1)
 
+    # Save file
     out_dir = Path(args.output) if args.output else OUTPUT_DIR
     filename = extract_filename(content, args.prompt)
     saved_path = save_file(content, filename, out_dir)
 
     ok(f"Saved to: {saved_path}")
 
-    # Авто-валидация
+    # Auto-validate
     errors, _ = validate_file(str(saved_path))
     if not errors:
         ok("Validation passed!")
     else:
         warn(f"Validation found {len(errors)} issues.")
+
+
+# ─── MODELS ───────────────────────────────────────────────────────────────────
+
+
+def cmd_models(args: argparse.Namespace) -> None:
+    """List available LLM providers."""
+    providers = list_providers()
+    
+    info("Available LLM providers:\n")
+    for name, available in providers.items():
+        provider = PROVIDERS[name]()
+        status = f"{GREEN}✅" if available else f"{RED}❌"
+        print(f"{status} {name:<10} {provider.display_name}{NC}")
+        if available:
+            print(f"   Model: {provider.model_name}")
+        else:
+            # Show what's needed
+            if name == "claude":
+                print(f"   {YELLOW}Set ANTHROPIC_API_KEY{NC}")
+            elif name == "gemini":
+                print(f"   {YELLOW}Set GOOGLE_API_KEY{NC}")
+            elif name == "gpt4":
+                print(f"   {YELLOW}Set OPENAI_API_KEY{NC}")
+            elif name == "ollama":
+                print(f"   {YELLOW}Run Ollama server{NC}")
+        print()
 
 
 # ─── ENTRY POINT ──────────────────────────────────────────────────────────────
@@ -175,18 +192,29 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="akf")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # Generate command
     gen = sub.add_parser("generate", help="Generate knowledge file")
     gen.add_argument("prompt")
+    gen.add_argument("--model", "-m",
+                     choices=["auto", "claude", "gemini", "gpt4", "ollama"],
+                     default="auto",
+                     help="LLM provider (default: auto-select)")
     gen.add_argument("--output", "-o", help="Custom output path")
 
+    # Validate command
     val = sub.add_parser("validate", help="Check Markdown YAML")
     val.add_argument("--file", "-f")
+    
+    # Models command
+    models = sub.add_parser("models", help="List available LLM providers")
 
     args = parser.parse_args()
     if args.command == "generate":
         cmd_generate(args)
     elif args.command == "validate":
         cmd_validate(args)
+    elif args.command == "models":
+        cmd_models(args)
     return 0
 
 
