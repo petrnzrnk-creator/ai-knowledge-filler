@@ -3,9 +3,11 @@
 Multi-LLM Provider Architecture for AI Knowledge Filler.
 
 Supports:
+- Groq (Llama 3.3 - fast inference)
+- Grok (xAI)
 - Claude (Anthropic)
 - Gemini (Google)
-- GPT-4 (OpenAI)
+- GPT-3.5 (OpenAI)
 - Ollama (local models)
 """
 
@@ -228,11 +230,11 @@ class OpenAIProvider(LLMProvider):
 
     @property
     def display_name(self) -> str:
-        return "GPT-4 (OpenAI)"
+        return "GPT-3.5 (OpenAI)"
 
     @property
     def model_name(self) -> str:
-        return "gpt-4-turbo-preview"
+        return "gpt-3.5-turbo"
 
 
 # ─── OLLAMA PROVIDER ──────────────────────────────────────────────────────────
@@ -293,6 +295,124 @@ class OllamaProvider(LLMProvider):
         return self.model
 
 
+# ─── GROQ PROVIDER ────────────────────────────────────────────────────────
+
+
+class GroqProvider(LLMProvider):
+    """Groq fast inference provider."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        """Initialize Groq provider.
+
+        Args:
+            api_key: Groq API key. If None, uses GROQ_API_KEY env var.
+        """
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+
+    def generate(self, prompt: str, system_prompt: str) -> str:
+        try:
+            from groq import Groq
+        except ImportError:
+            raise ImportError("groq library not installed. Run: pip install groq")
+
+        client = Groq(api_key=self.api_key)
+
+        response = client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=4096,
+            temperature=0.7,
+        )
+
+        return response.choices[0].message.content
+
+    def is_available(self) -> bool:
+        if not self.api_key:
+            return False
+        try:
+            from groq import Groq  # noqa: F401
+
+            return True
+        except ImportError:
+            return False
+
+    @property
+    def name(self) -> str:
+        return "groq"
+
+    @property
+    def display_name(self) -> str:
+        return "Groq (Llama 3.3)"
+
+    @property
+    def model_name(self) -> str:
+        return "llama-3.3-70b-versatile"
+
+
+# ─── XAI PROVIDER ─────────────────────────────────────────────────────────
+
+
+class XAIProvider(LLMProvider):
+    """xAI Grok provider."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        """Initialize xAI provider.
+
+        Args:
+            api_key: xAI API key. If None, uses XAI_API_KEY env var.
+        """
+        self.api_key = api_key or os.getenv("XAI_API_KEY")
+
+    def generate(self, prompt: str, system_prompt: str) -> str:
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImportError("openai library not installed. Run: pip install openai")
+
+        # xAI uses OpenAI-compatible API
+        client = OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.x.ai/v1",
+        )
+
+        response = client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=4096,
+            temperature=0.7,
+        )
+
+        return response.choices[0].message.content
+
+    def is_available(self) -> bool:
+        if not self.api_key:
+            return False
+        try:
+            from openai import OpenAI  # noqa: F401
+
+            return True
+        except ImportError:
+            return False
+
+    @property
+    def name(self) -> str:
+        return "grok"
+
+    @property
+    def display_name(self) -> str:
+        return "Grok (xAI)"
+
+    @property
+    def model_name(self) -> str:
+        return "grok-beta"
+
+
 # ─── PROVIDER REGISTRY ────────────────────────────────────────────────────────
 
 
@@ -300,6 +420,8 @@ PROVIDERS: Dict[str, Type[LLMProvider]] = {
     "claude": ClaudeProvider,
     "gemini": GeminiProvider,
     "gpt4": OpenAIProvider,
+    "groq": GroqProvider,
+    "grok": XAIProvider,
     "ollama": OllamaProvider,
 }
 
@@ -317,15 +439,16 @@ def get_provider(name: str = "auto") -> LLMProvider:
         ValueError: If provider not found or not available.
     """
     if name == "auto":
-        # Try providers in priority order
-        for provider_name in ["claude", "gemini", "gpt4", "ollama"]:
+        # Try providers in priority order (fast and free-tier friendly first)
+        for provider_name in ["groq", "grok", "claude", "gemini", "gpt4", "ollama"]:
             provider_class = PROVIDERS[provider_name]
             provider = provider_class()
             if provider.is_available():
                 return provider
         raise ValueError(
             "No LLM providers available. Set API keys: "
-            "ANTHROPIC_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY, or run Ollama."
+            "GROQ_API_KEY, XAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, "
+            "OPENAI_API_KEY, or run Ollama."
         )
 
     if name not in PROVIDERS:

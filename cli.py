@@ -180,6 +180,10 @@ def cmd_models(args: argparse.Namespace) -> None:
                 print(f"   {YELLOW}Set GOOGLE_API_KEY{NC}")
             elif name == "gpt4":
                 print(f"   {YELLOW}Set OPENAI_API_KEY{NC}")
+            elif name == "groq":
+                print(f"   {YELLOW}Set GROQ_API_KEY{NC}")
+            elif name == "grok":
+                print(f"   {YELLOW}Set XAI_API_KEY{NC}")
             elif name == "ollama":
                 print(f"   {YELLOW}Run Ollama server{NC}")
         print()
@@ -196,7 +200,7 @@ def main() -> int:
     gen = sub.add_parser("generate", help="Generate knowledge file")
     gen.add_argument("prompt")
     gen.add_argument("--model", "-m",
-                     choices=["auto", "claude", "gemini", "gpt4", "ollama"],
+                     choices=["auto", "claude", "gemini", "gpt4", "groq", "grok", "ollama"],
                      default="auto",
                      help="LLM provider (default: auto-select)")
     gen.add_argument("--output", "-o", help="Custom output path")
