@@ -91,39 +91,30 @@ def _validate_enum_fields(metadata: dict, errors: List[str], warnings: List[str]
     """Validate enum fields: type, level, status, domain."""
     if "type" in metadata and metadata["type"] not in VALID_TYPES:
         errors.append(
-            f"Invalid type: {metadata['type']}. "
-            f"Must be one of: {', '.join(VALID_TYPES)}"
+            f"Invalid type: {metadata['type']}. " f"Must be one of: {', '.join(VALID_TYPES)}"
         )
 
     if "level" in metadata and metadata["level"] not in VALID_LEVELS:
         errors.append(
-            f"Invalid level: {metadata['level']}. "
-            f"Must be one of: {', '.join(VALID_LEVELS)}"
+            f"Invalid level: {metadata['level']}. " f"Must be one of: {', '.join(VALID_LEVELS)}"
         )
 
     if "status" in metadata and metadata["status"] not in VALID_STATUSES:
         errors.append(
-            f"Invalid status: {metadata['status']}. "
-            f"Must be one of: {', '.join(VALID_STATUSES)}"
+            f"Invalid status: {metadata['status']}. " f"Must be one of: {', '.join(VALID_STATUSES)}"
         )
 
     if "domain" in metadata and metadata["domain"] not in VALID_DOMAINS:
-        warnings.append(
-            f"Domain '{metadata['domain']}' not in standard taxonomy"
-        )
+        warnings.append(f"Domain '{metadata['domain']}' not in standard taxonomy")
 
 
 def _validate_dates(metadata: dict, errors: List[str]) -> None:
     """Validate created and updated date fields."""
     if "created" in metadata and not validate_date_format(metadata["created"]):
-        errors.append(
-            f"Invalid created date format: {metadata['created']}. Use YYYY-MM-DD"
-        )
+        errors.append(f"Invalid created date format: {metadata['created']}. Use YYYY-MM-DD")
 
     if "updated" in metadata and not validate_date_format(metadata["updated"]):
-        errors.append(
-            f"Invalid updated date format: {metadata['updated']}. Use YYYY-MM-DD"
-        )
+        errors.append(f"Invalid updated date format: {metadata['updated']}. Use YYYY-MM-DD")
 
 
 def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> None:
@@ -242,9 +233,7 @@ def main() -> None:
     all_files = glob.glob("**/*.md", recursive=True)
 
     md_files = [
-        f
-        for f in all_files
-        if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md"])
+        f for f in all_files if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md"])
     ]
 
     total_files = len(md_files)
