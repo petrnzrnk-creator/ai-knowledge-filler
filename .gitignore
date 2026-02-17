@@ -45,3 +45,4 @@ TODO_PRIVATE.md
 htmlcov/
 .coverage
 *.txt
+.stversions/
