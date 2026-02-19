@@ -220,6 +220,9 @@ def _validate_dates(metadata: dict, errors: List[str]) -> None:
         errors.append(f"Invalid updated date format: '{metadata['updated']}'. Use YYYY-MM-DD")
 
 
+_WIKILINK_RE = re.compile(r'^\[\[.+\]\]$')
+
+
 def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> None:
     """Validate tags and related array fields.
 
@@ -233,6 +236,15 @@ def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> 
     if "related" in metadata and metadata["related"] is not None:
         if not isinstance(metadata["related"], list):
             errors.append("'related' must be an array or null")
+        else:
+            bad = [
+                item for item in metadata["related"]
+                if isinstance(item, str) and not _WIKILINK_RE.match(item)
+            ]
+            if bad:
+                errors.append(
+                    f"Related links must use [[WikiLink]] format. Invalid: {bad}"
+                )
     if "tags" in metadata and isinstance(metadata["tags"], list) and len(metadata["tags"]) < 3:
         warnings.append(f"Only {len(metadata['tags'])} tag(s) found (recommended: 3-10)")
     if not metadata.get("related"):
@@ -262,6 +274,7 @@ def _parse_frontmatter(content: str) -> Tuple[dict, List[str]]:
 def validate_file(
     filepath: str,
     valid_domains: Optional[List[str]] = None,
+    strict: bool = False,
 ) -> Tuple[List[str], List[str]]:
     """Validate a single Markdown file's YAML frontmatter.
 
@@ -269,6 +282,7 @@ def validate_file(
         filepath: Path to the Markdown file to validate.
         valid_domains: List of valid domain strings. If not provided,
             loads from Domain_Taxonomy.md automatically.
+        strict: If True, warnings are promoted to errors.
 
     Returns:
         A tuple of (errors, warnings) lists.
@@ -308,6 +322,10 @@ def validate_file(
         errors.append(f"YAML parsing error: {e}")
     except Exception as e:
         errors.append(f"Unexpected error: {e}")
+
+    if strict and warnings:
+        errors.extend([f"[strict] {w}" for w in warnings])
+        warnings = []
 
     return errors, warnings
 

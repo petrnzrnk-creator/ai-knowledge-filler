@@ -45,54 +45,76 @@ def err(msg: str) -> None:
 
 # ─── VALIDATE ─────────────────────────────────────────────────────────────────
 
+try:
+    from validate_yaml import validate_file as _validate_file, load_domains_from_taxonomy
+    _FULL_VALIDATOR = True
+except ImportError:
+    _FULL_VALIDATOR = False
 
-def validate_file(filepath: str) -> tuple[list[str], list[str]]:
-    """Валидация YAML фронтматтера."""
-    errors, warnings = [], []
+
+def validate_file(filepath: str, strict: bool = False) -> tuple[list[str], list[str]]:
+    """Валидация через validate_yaml (полная) или fallback (базовая)."""
+    if _FULL_VALIDATOR:
+        return _validate_file(filepath, strict=strict)
+    # Fallback: базовая проверка без validate_yaml
+    errors: list[str] = []
     try:
         import yaml
-    except ImportError:
-        return ["pyyaml not installed."], []
-
-    if not os.path.exists(filepath):
-        return [f"File not found: {filepath}"], []
-
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    if not content.startswith("---"):
-        return ["No YAML frontmatter found"], []
-
-    parts = content.split("---")
-    if len(parts) < 3:
-        return ["Invalid YAML structure"], []
-
-    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+        if not content.startswith("---"):
+            return ["No YAML frontmatter found"], []
+        parts = content.split("---", 2)
         metadata = yaml.safe_load(parts[1]) or {}
-    except yaml.YAMLError as e:
-        return [f"YAML error: {e}"], []
-
-    required = ["title", "type", "level", "status", "created", "updated"]
-    for field in required:
-        if field not in metadata:
-            errors.append(f"Missing field: {field}")
-
-    return errors, warnings
+        for field in ["title", "type", "domain", "level", "status", "created", "updated"]:
+            if field not in metadata:
+                errors.append(f"Missing field: {field}")
+    except Exception as e:
+        errors.append(str(e))
+    return errors, []
 
 
 def cmd_validate(args: argparse.Namespace) -> None:
     import glob
 
-    files = [args.file] if args.file else glob.glob("**/*.md", recursive=True)
+    # Resolve file list
+    if args.file:
+        files = [args.file]
+    elif args.path:
+        base = Path(args.path)
+        files = [str(p) for p in base.rglob("*.md")]
+    else:
+        files = glob.glob("**/*.md", recursive=True)
+
     files = [f for f in files if not any(x in f for x in [".github", "README.md"])]
 
-    info(f"Checking {len(files)} files...")
+    strict = getattr(args, "strict", False)
+    mode = " [STRICT]" if strict else ""
+    info(f"Checking {len(files)} files{mode}...")
+
+    total = valid = warned = failed = 0
     for filepath in sorted(files):
-        errors, _ = validate_file(filepath)
+        total += 1
+        errors, warnings = validate_file(filepath, strict=strict)
+        rel = filepath
         if errors:
-            print(f"{RED}❌ {filepath}{NC}")
+            failed += 1
+            print(f"{RED}❌ {rel}{NC}")
+            for e in errors:
+                print(f"   {RED}{e}{NC}")
+        elif warnings:
+            warned += 1
+            print(f"{YELLOW}⚠  {rel}{NC}")
+            for w in warnings:
+                print(f"   {YELLOW}{w}{NC}")
         else:
-            print(f"{GREEN}✅ {filepath}{NC}")
+            valid += 1
+            print(f"{GREEN}✅ {rel}{NC}")
+
+    print()
+    info(f"Total: {total} | OK: {valid} | Warnings: {warned} | Errors: {failed}")
+    if failed > 0:
+        sys.exit(1)
 
 
 # ─── GENERATE ─────────────────────────────────────────────────────────────────
@@ -207,7 +229,10 @@ def main() -> int:
 
     # Validate command
     val = sub.add_parser("validate", help="Check Markdown YAML")
-    val.add_argument("--file", "-f")
+    val.add_argument("--file", "-f", help="Validate single file")
+    val.add_argument("--path", "-p", help="Validate all .md files in folder")
+    val.add_argument("--strict", "-s", action="store_true",
+                     help="Promote warnings to errors")
     
     # Models command
     models = sub.add_parser("models", help="List available LLM providers")
