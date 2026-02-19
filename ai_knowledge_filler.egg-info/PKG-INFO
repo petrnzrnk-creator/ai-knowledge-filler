@@ -1,0 +1,442 @@
+Metadata-Version: 2.4
+Name: ai-knowledge-filler
+Version: 0.1.0
+Summary: Knowledge engineering system — transforms LLMs into deterministic Obsidian file generators
+Author: Petro Nzrnk
+License: MIT
+Project-URL: Homepage, https://github.com/petrnzrnk-creator/ai-knowledge-filler
+Keywords: obsidian,knowledge-base,llm,markdown,ai
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: anthropic
+Requires-Dist: anthropic>=0.40.0; extra == "anthropic"
+Provides-Extra: all
+Requires-Dist: anthropic>=0.40.0; extra == "all"
+Requires-Dist: google-generativeai>=0.3.0; extra == "all"
+Requires-Dist: openai>=1.0.0; extra == "all"
+Dynamic: license-file
+
+# AI Knowledge Filler
+
+**Transform any LLM into a deterministic knowledge base generator**
+
+[![Tests](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Tests/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
+[![Lint](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Lint/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/lint.yml)
+[![Validate](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Validate%20Metadata/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/validate.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
+[![Pylint](https://img.shields.io/badge/pylint-9.55%2F10-brightgreen)](https://github.com/petrnzrnk-creator/ai-knowledge-filler)
+
+---
+
+## Problem → Solution
+
+**Problem:** LLMs generate inconsistent, unstructured responses that require manual formatting.
+
+**Solution:** System prompt that transforms any LLM into a deterministic file generator — same input, same structure, every time.
+
+**Result:** Production-ready Markdown files with validated YAML metadata. Zero manual post-processing.
+
+---
+
+## ⚡ Quick Start (60 seconds)
+
+### Option 1: Claude Projects (Recommended)
+
+```markdown
+1. Open Claude.ai → Create new Project
+2. Project Knowledge → Upload Core_System/System_Prompt_AI_Knowledge_Filler.md
+3. Custom Instructions → Paste Core_System/Custom_Instructions.md
+4. Prompt: "Create guide on API authentication"
+5. Done. Claude generates structured files.
+```
+
+### Option 2: CLI (Multi-LLM)
+
+```bash
+# Clone repository
+git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
+cd ai-knowledge-filler
+
+# Install
+pip install -r requirements.txt
+
+# Configure (any LLM)
+export ANTHROPIC_API_KEY="sk-ant-..."  # or GOOGLE_API_KEY, OPENAI_API_KEY
+
+# Generate
+python3 cli.py generate "Create Docker security checklist" --model claude
+```
+
+**Output:** `outputs/Docker_Security_Checklist.md` — production-ready, validated.
+
+---
+
+## What You Get
+
+### Core System (6 files)
+- **System Prompt** — Transforms LLM from chat to file generator
+- **Metadata Standard** — YAML structure specification
+- **Domain Taxonomy** — 30+ classification domains
+- **Update Protocol** — File merge rules
+- **Validation Script** — Automated quality gates
+- **CLI** — Multi-LLM interface (Claude, Gemini, GPT-4, Ollama)
+
+### Quality Assurance
+- ✅ 96% test coverage (58 tests)
+- ✅ Automated YAML validation
+- ✅ CI/CD pipelines (GitHub Actions)
+- ✅ Type hints (100% coverage)
+- ✅ Linting (Pylint 9.55/10)
+
+---
+
+## CLI Commands
+
+### Generate Files
+
+```bash
+# Auto-select first available LLM
+python3 cli.py generate "Create Kubernetes deployment guide"
+
+# Specific model
+python3 cli.py generate "Create API checklist" --model claude
+python3 cli.py generate "Create Docker guide" --model gemini
+python3 cli.py generate "Create REST concept" --model gpt4
+python3 cli.py generate "Create microservices reference" --model ollama
+```
+
+### Validate Files
+
+```bash
+# Single file
+python3 cli.py validate --file outputs/Guide.md
+
+# All files
+python3 cli.py validate
+```
+
+### List Available Models
+
+```bash
+python3 cli.py models
+
+# Output:
+# ✅ claude     Claude (Anthropic) — claude-sonnet-4-20250514
+# ✅ gemini     Gemini (Google) — gemini-3-flash-preview
+# ❌ gpt4       GPT-4 (OpenAI) — Set OPENAI_API_KEY
+# ✅ ollama     Ollama (llama3.2:3b)
+```
+
+---
+
+## Example Output
+
+**Input:**
+```
+Create guide on API rate limiting
+```
+
+**Output:**
+```yaml
+---
+title: "API Rate Limiting Strategy"
+type: guide
+domain: api-design
+level: intermediate
+status: active
+version: v1.0
+tags: [api, rate-limiting, performance]
+related:
+  - "[[API Design Principles]]"
+  - "[[System Scalability]]"
+created: 2026-02-12
+updated: 2026-02-12
+---
+
+## Purpose
+Comprehensive strategy for implementing API rate limits...
+
+## Core Principles
+[Structured content with sections, code examples]
+
+## Implementation
+[Step-by-step technical guidance]
+
+## Conclusion
+[Summary and next steps]
+```
+
+**Every file. Same structure. Validated automatically.**
+
+---
+
+## Architecture
+
+```
+User Prompt
+    ↓
+System Prompt (behavior definition)
+    ↓
+LLM Provider (Claude/Gemini/GPT-4/Ollama)
+    ↓
+Structured Markdown + YAML
+    ↓
+Automated Validation
+    ↓
+Production-Ready File
+```
+
+**Key Insight:** System prompt is the source of truth. Same prompt works across all LLMs.
+
+---
+
+## Model Selection
+
+| Model | Speed | Cost | Best For |
+|-------|-------|------|----------|
+| **Claude** | Medium | $$$ | Technical docs, architecture |
+| **Gemini** | Fast | $ | Quick drafts, summaries |
+| **GPT-4** | Slow | $$$$ | Versatile content |
+| **Ollama** | Very Fast | Free | Privacy, offline, local |
+
+**Auto-selection:** CLI tries providers in order: Claude → Gemini → GPT-4 → Ollama (first available).
+
+---
+
+## Installation
+
+### Prerequisites
+
+```bash
+python3 --version  # 3.10+
+pip3 --version
+```
+
+### Setup
+
+```bash
+git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
+cd ai-knowledge-filler
+
+# Minimal (validation only)
+pip install pyyaml
+
+# Full (Multi-LLM generation)
+pip install -r requirements.txt
+```
+
+### API Keys
+
+```bash
+# Set at least one
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="AIza..."
+export OPENAI_API_KEY="sk-..."
+
+# Or create .env file
+cat > .env << 'EOF'
+ANTHROPIC_API_KEY=your-key-here
+GOOGLE_API_KEY=your-key-here
+EOF
+```
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+pytest --cov=Scripts --cov-report=term-missing -v
+
+# Run validation
+python Scripts/validate_yaml.py
+
+# Run linting
+flake8 Scripts/ tests/
+black --check Scripts/ tests/
+pylint Scripts/ tests/
+```
+
+**Coverage:** 96% (58 tests)  
+**Linting:** Pylint 9.55/10  
+**CI/CD:** All checks passing
+
+---
+
+## Use Cases
+
+**1. Technical Documentation**
+Generate API docs, architecture decisions, deployment guides.
+
+**2. Knowledge Management**
+Structure meeting notes, research findings, learning content.
+
+**3. Consulting Deliverables**
+Create frameworks, methodologies, client reports.
+
+**4. Batch Processing**
+Generate multiple files programmatically via CLI or API.
+
+**Full examples:** [Use_Cases_Documentation.md](Documentation/Use_Cases_Documentation.md)
+
+---
+
+## File Types
+
+```yaml
+type: concept      # Theoretical entity, definition
+type: guide        # Step-by-step process
+type: reference    # Specification, standard
+type: checklist    # Validation criteria
+type: project      # Project description
+type: template     # Reusable template
+```
+
+**30+ domains:** `api-design`, `system-design`, `devops`, `security`, `data-engineering`, etc.
+
+See [Domain_Taxonomy.md](Core_System/Domain_Taxonomy.md) for complete list.
+
+---
+
+## Documentation
+
+### Core System
+- [System Prompt](Core_System/System_Prompt_AI_Knowledge_Filler.md) — LLM behavior definition
+- [Metadata Standard](Core_System/Metadata_Template_Standard.md) — YAML specification
+- [Domain Taxonomy](Core_System/Domain_Taxonomy.md) — Classification system
+- [Update Protocol](Core_System/File_Update_Protocol.md) — Merge rules
+
+### Guides
+- [Deployment Guide](Documentation/Deployment_Guide.md) — Installation options
+- [Use Cases](Documentation/Use_Cases_Documentation.md) — 20+ scenarios
+- [Workflow](Core_System/Prompt_Engineering_Workflow.md) — 8-stage methodology
+
+---
+
+## Advanced Usage
+
+### Programmatic Generation
+
+```python
+from llm_providers import get_provider
+
+# Auto-select provider
+provider = get_provider("auto")
+
+# Load system prompt
+with open('Core_System/System_Prompt_AI_Knowledge_Filler.md') as f:
+    system_prompt = f.read()
+
+# Generate
+content = provider.generate(
+    prompt="Create API security checklist",
+    system_prompt=system_prompt
+)
+
+# Save
+with open('outputs/Security_Checklist.md', 'w') as f:
+    f.write(content)
+```
+
+### Batch Processing
+
+```bash
+# Create multiple files
+cat > topics.txt << 'EOF'
+Docker deployment best practices
+Kubernetes security hardening
+API authentication strategies
+EOF
+
+while read topic; do
+    python3 cli.py generate "Create guide on $topic" --model gemini
+done < topics.txt
+```
+
+---
+
+## Validation
+
+**Automated checks:**
+- ✅ YAML frontmatter present
+- ✅ Required fields (title, type, domain, level, status, created, updated)
+- ✅ Valid enum values (type, level, status)
+- ✅ Domain in taxonomy
+- ✅ ISO 8601 dates (YYYY-MM-DD)
+- ✅ Tags array (3+ items)
+
+**Run validation:**
+```bash
+python Scripts/validate_yaml.py
+# or
+python3 cli.py validate
+```
+
+**Output:**
+```
+✅ Documentation/Guide.md
+❌ drafts/incomplete.md
+   ERROR: Missing field: domain
+   ERROR: Invalid type: document
+```
+
+---
+
+## Roadmap
+
+### v1.0 ✅
+- [x] System Prompt (universal LLM compatibility)
+- [x] YAML Metadata Standard
+- [x] Domain Taxonomy (30+ domains)
+- [x] Validation Script (96% test coverage)
+- [x] Multi-LLM CLI (Claude, Gemini, GPT-4, Ollama)
+- [x] CI/CD Pipelines (GitHub Actions)
+
+### v1.1 (Next)
+- [ ] PyPI package (`pip install akf-cli`)
+- [ ] VSCode extension (YAML validation)
+- [ ] Obsidian plugin integration
+- [ ] Enhanced documentation
+
+---
+
+## License
+
+MIT License — Free for commercial and personal use.
+
+---
+
+## Philosophy
+
+**This is knowledge engineering, not chat enhancement.**
+
+LLMs are **deterministic infrastructure**, not conversational toys.
+
+**Before:** "AI helps me write notes"  
+**After:** "AI compiles my knowledge base"
+
+---
+
+**Created by:** Petr — AI Solutions Architect  
+**Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler  
+**Version:** 1.0.0  
+
+---
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/petrnzrnk-creator/ai-knowledge-filler/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/petrnzrnk-creator/ai-knowledge-filler/discussions)
+
+---
+
+**Quick Links:**  
+[Quick Start](#-quick-start-60-seconds) | [CLI Commands](#cli-commands) | [Documentation](#documentation) | [Examples](#example-output)
