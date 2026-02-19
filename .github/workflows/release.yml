@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Clean dist
+        run: rm -rf dist/
       - name: Build
         run: |
           pip install build twine
@@ -38,3 +40,4 @@ jobs:
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
           attestations: false
+          skip-existing: true
