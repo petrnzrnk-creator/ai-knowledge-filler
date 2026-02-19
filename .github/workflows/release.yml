@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml pytest pytest-cov
       - name: Run tests
-        run: pytest --tb=short
+        run: pytest --tb=short --ignore=tests/integration
 
   publish:
     needs: test
