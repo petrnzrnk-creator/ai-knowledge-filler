@@ -5,6 +5,7 @@
 [![Tests](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Tests/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
 [![Lint](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Lint/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/lint.yml)
 [![Validate](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Validate%20Metadata/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/validate.yml)
+[![PyPI](https://img.shields.io/pypi/v/ai-knowledge-filler.svg)](https://pypi.org/project/ai-knowledge-filler/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
@@ -24,34 +25,29 @@
 
 ## ⚡ Quick Start (60 seconds)
 
-### Option 1: Claude Projects (Recommended)
+### Option 1: pip install (Recommended)
 
-```markdown
+```bash
+pip install ai-knowledge-filler
+
+# Set at least one API key
+export ANTHROPIC_API_KEY="sk-ant-..."  # or GOOGLE_API_KEY, OPENAI_API_KEY
+
+# Generate
+akf generate "Create Docker security checklist"
+```
+
+**Output:** `outputs/Docker_Security_Checklist.md` — production-ready, validated.
+
+### Option 2: Claude Projects (No CLI)
+
+```
 1. Open Claude.ai → Create new Project
 2. Project Knowledge → Upload Core_System/System_Prompt_AI_Knowledge_Filler.md
 3. Custom Instructions → Paste Core_System/Custom_Instructions.md
 4. Prompt: "Create guide on API authentication"
 5. Done. Claude generates structured files.
 ```
-
-### Option 2: CLI (Multi-LLM)
-
-```bash
-# Clone repository
-git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
-cd ai-knowledge-filler
-
-# Install
-pip install -r requirements.txt
-
-# Configure (any LLM)
-export ANTHROPIC_API_KEY="sk-ant-..."  # or GOOGLE_API_KEY, OPENAI_API_KEY
-
-# Generate
-python3 cli.py generate "Create Docker security checklist" --model claude
-```
-
-**Output:** `outputs/Docker_Security_Checklist.md` — production-ready, validated.
 
 ---
 
@@ -66,7 +62,7 @@ python3 cli.py generate "Create Docker security checklist" --model claude
 - **CLI** — Multi-LLM interface (Claude, Gemini, GPT-4, Ollama)
 
 ### Quality Assurance
-- ✅ 96% test coverage (58 tests)
+- ✅ 96% test coverage (82 tests)
 - ✅ Automated YAML validation
 - ✅ CI/CD pipelines (GitHub Actions)
 - ✅ Type hints (100% coverage)
@@ -80,33 +76,33 @@ python3 cli.py generate "Create Docker security checklist" --model claude
 
 ```bash
 # Auto-select first available LLM
-python3 cli.py generate "Create Kubernetes deployment guide"
+akf generate "Create Kubernetes deployment guide"
 
 # Specific model
-python3 cli.py generate "Create API checklist" --model claude
-python3 cli.py generate "Create Docker guide" --model gemini
-python3 cli.py generate "Create REST concept" --model gpt4
-python3 cli.py generate "Create microservices reference" --model ollama
+akf generate "Create API checklist" --model claude
+akf generate "Create Docker guide" --model gemini
+akf generate "Create REST concept" --model gpt4
+akf generate "Create microservices reference" --model ollama
 ```
 
 ### Validate Files
 
 ```bash
 # Single file
-python3 cli.py validate --file outputs/Guide.md
+akf validate --file outputs/Guide.md
 
-# All files
-python3 cli.py validate
+# All files in outputs/
+akf validate
 ```
 
 ### List Available Models
 
 ```bash
-python3 cli.py models
+akf models
 
 # Output:
 # ✅ claude     Claude (Anthropic) — claude-sonnet-4-20250514
-# ✅ gemini     Gemini (Google) — gemini-3-flash-preview
+# ✅ gemini     Gemini (Google) — gemini-2.0-flash
 # ❌ gpt4       GPT-4 (OpenAI) — Set OPENAI_API_KEY
 # ✅ ollama     Ollama (llama3.2:3b)
 ```
@@ -189,23 +185,17 @@ Production-Ready File
 
 ## Installation
 
-### Prerequisites
+### Via pip (Recommended)
 
 ```bash
-python3 --version  # 3.10+
-pip3 --version
+pip install ai-knowledge-filler
 ```
 
-### Setup
+### From Source
 
 ```bash
 git clone https://github.com/petrnzrnk-creator/ai-knowledge-filler.git
 cd ai-knowledge-filler
-
-# Minimal (validation only)
-pip install pyyaml
-
-# Full (Multi-LLM generation)
 pip install -r requirements.txt
 ```
 
@@ -230,19 +220,17 @@ EOF
 
 ```bash
 # Run all tests
-pytest --cov=Scripts --cov-report=term-missing -v
+pytest --cov=. --cov-report=term-missing -v
 
 # Run validation
-python Scripts/validate_yaml.py
+akf validate
 
 # Run linting
-flake8 Scripts/ tests/
-black --check Scripts/ tests/
-pylint Scripts/ tests/
+pylint *.py tests/
 ```
 
-**Coverage:** 96% (58 tests)  
-**Linting:** Pylint 9.55/10  
+**Coverage:** 96% (82 tests)
+**Linting:** Pylint 9.55/10
 **CI/CD:** All checks passing
 
 ---
@@ -325,7 +313,6 @@ with open('outputs/Security_Checklist.md', 'w') as f:
 ### Batch Processing
 
 ```bash
-# Create multiple files
 cat > topics.txt << 'EOF'
 Docker deployment best practices
 Kubernetes security hardening
@@ -333,7 +320,7 @@ API authentication strategies
 EOF
 
 while read topic; do
-    python3 cli.py generate "Create guide on $topic" --model gemini
+    akf generate "Create guide on $topic" --model gemini
 done < topics.txt
 ```
 
@@ -349,16 +336,9 @@ done < topics.txt
 - ✅ ISO 8601 dates (YYYY-MM-DD)
 - ✅ Tags array (3+ items)
 
-**Run validation:**
-```bash
-python Scripts/validate_yaml.py
-# or
-python3 cli.py validate
-```
-
 **Output:**
 ```
-✅ Documentation/Guide.md
+✅ outputs/Guide.md
 ❌ drafts/incomplete.md
    ERROR: Missing field: domain
    ERROR: Invalid type: document
@@ -368,19 +348,20 @@ python3 cli.py validate
 
 ## Roadmap
 
-### v1.0 ✅
+### v0.1.x ✅ (Current)
 - [x] System Prompt (universal LLM compatibility)
 - [x] YAML Metadata Standard
 - [x] Domain Taxonomy (30+ domains)
-- [x] Validation Script (96% test coverage)
+- [x] Validation Script (96% test coverage, 82 tests)
 - [x] Multi-LLM CLI (Claude, Gemini, GPT-4, Ollama)
 - [x] CI/CD Pipelines (GitHub Actions)
+- [x] PyPI package (`pip install ai-knowledge-filler`)
 
-### v1.1 (Next)
-- [ ] PyPI package (`pip install akf-cli`)
-- [ ] VSCode extension (YAML validation)
-- [ ] Obsidian plugin integration
+### v0.2.x (Next)
+- [ ] Obsidian vault auto-routing
+- [ ] Local model support (llama.cpp endpoint)
 - [ ] Enhanced documentation
+- [ ] VSCode extension (YAML validation)
 
 ---
 
@@ -396,14 +377,15 @@ MIT License — Free for commercial and personal use.
 
 LLMs are **deterministic infrastructure**, not conversational toys.
 
-**Before:** "AI helps me write notes"  
+**Before:** "AI helps me write notes"
 **After:** "AI compiles my knowledge base"
 
 ---
 
-**Created by:** Petr — AI Solutions Architect  
-**Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler  
-**Version:** 1.0.0  
+**Created by:** Petr — AI Solutions Architect
+**PyPI:** https://pypi.org/project/ai-knowledge-filler/
+**Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
+**Version:** 0.1.2
 
 ---
 
@@ -414,5 +396,5 @@ LLMs are **deterministic infrastructure**, not conversational toys.
 
 ---
 
-**Quick Links:**  
+**Quick Links:**
 [Quick Start](#-quick-start-60-seconds) | [CLI Commands](#cli-commands) | [Documentation](#documentation) | [Examples](#example-output)

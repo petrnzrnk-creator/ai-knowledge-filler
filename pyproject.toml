@@ -3,14 +3,13 @@ name = "ai-knowledge-filler"
 version = "0.1.2"
 description = "Knowledge engineering system — transforms LLMs into deterministic Obsidian file generators"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "Petro Nzrnk" }]
 keywords = ["obsidian", "knowledge-base", "llm", "markdown", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = ["pyyaml>=6.0"]
