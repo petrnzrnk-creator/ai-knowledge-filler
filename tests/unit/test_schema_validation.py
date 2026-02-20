@@ -11,7 +11,7 @@ import tempfile
 
 import pytest
 
-from validate_yaml import _validate_arrays, validate_file
+from Scripts.validate_yaml import _validate_arrays, validate_file
 
 
 # ─── VALID FRONTMATTER for reuse ─────────────────────────────────────────────
