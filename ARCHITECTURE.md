@@ -19,7 +19,7 @@ LLM API         — Claude / Gemini / GPT-3.5 / Groq / Grok / Ollama
     ↓
 Raw Markdown output
     ↓
-validate_yaml.py — frontmatter validation against Metadata Standard
+Scripts/validate_yaml.py — frontmatter validation against Metadata Standard
     ↓
 📄 Output file (saved to vault or custom path)
 ```
@@ -32,7 +32,7 @@ validate_yaml.py — frontmatter validation against Metadata Standard
 |--------|---------------|----------------|
 | `cli.py` | Entry point, argument parsing, orchestration | `main()`, `cmd_generate()`, `cmd_validate()`, `cmd_models()` |
 | `llm_providers.py` | Abstract provider layer, 6 implementations, retry + fallback | `get_provider()`, `list_providers()`, `generate_with_retry()`, `generate_with_fallback()`, `PROVIDERS` |
-| `validate_yaml.py` | YAML frontmatter validation, domain taxonomy loading | `validate_file()`, `load_domains_from_taxonomy()` |
+| `Scripts/validate_yaml.py` | YAML frontmatter validation | `validate_file(filepath, strict=False)` |
 | `exceptions.py` | Typed exception hierarchy | `AKFError`, `LLMError`, `ValidationError`, `ConfigError`, `FileError` and subclasses |
 | `logger.py` | Logging configuration — human-readable or JSON | `get_logger()` |
 | `akf/__init__.py` | Package namespace, version | `__version__` |
@@ -137,7 +137,7 @@ flowchart TD
 
 ### Domain Loading
 
-`validate_yaml.py` loads valid domains from `Domain_Taxonomy.md` at runtime:
+`Scripts/validate_yaml.py` loads valid domains from `Domain_Taxonomy.md` at runtime:
 
 1. Search upward from `cwd()` for `Domain_Taxonomy.md`
 2. If not found, `rglob()` the cwd tree
@@ -209,11 +209,11 @@ The system prompt is the sole document governing output format. It defines: YAML
 ### Add a new domain
 
 1. Add `#### domain-name` section to `Domain_Taxonomy.md`
-2. `validate_yaml.py` picks it up automatically at next run — no code change needed
+2. `Scripts/validate_yaml.py` picks it up automatically at next run — no code change needed
 
 ### Add a new YAML type or status
 
-1. Update `VALID_TYPES` / `VALID_STATUSES` in `validate_yaml.py`
+1. Update `VALID_TYPES` / `VALID_STATUSES` in `Scripts/validate_yaml.py`
 2. Update `Metadata_Template_Standard.md` to document the new value
 
 ---
