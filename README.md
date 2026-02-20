@@ -54,7 +54,7 @@ akf generate "Create Docker security checklist"
 
 ## What You Get
 
-### Core System (6 files)
+### Core System
 - **System Prompt** — Transforms LLM from chat to file generator
 - **Metadata Standard** — YAML structure specification
 - **Domain Taxonomy** — 30+ classification domains
@@ -253,8 +253,6 @@ Create frameworks, methodologies, client reports.
 **4. Batch Processing**
 Generate multiple files programmatically via CLI or API.
 
-**Full examples:** [Use_Cases_Documentation.md](docs/user-guide.md)
-
 ---
 
 ## File Types
@@ -270,26 +268,13 @@ type: template     # Reusable template
 
 **30+ domains:** `api-design`, `system-design`, `devops`, `security`, `data-engineering`, etc.
 
-See [Domain_Taxonomy.md](docs/user-guide.md) for complete list.
-
 ---
 
 ## Documentation
 
-### Core System
 - [System Prompt](akf/system_prompt.md) — LLM behavior definition
-- [Metadata Standard](docs/user-guide.md) — YAML specification
-- [Domain Taxonomy](docs/user-guide.md) — Classification system
-- [Update Protocol](docs/user-guide.md) — Merge rules
-
-### Guides
 - [User Guide](docs/user-guide.md) — Installation, quick start, troubleshooting
 - [CLI Reference](docs/cli-reference.md) — All commands, flags, env vars, exit codes
-- [Deployment Guide](docs/user-guide.md) — Installation options
-- [Use Cases](docs/user-guide.md) — 20+ scenarios
-- [Workflow](docs/user-guide.md) — 8-stage methodology
-
-### Development
 - [Architecture](ARCHITECTURE.md) — Module map, data flow, extension points
 - [Contributing](CONTRIBUTING.md) — Dev setup, quality gates, adding providers
 
@@ -395,7 +380,7 @@ LLMs are **deterministic infrastructure**, not conversational toys.
 **Created by:** Petr — AI Solutions Architect
 **PyPI:** https://pypi.org/project/ai-knowledge-filler/
 **Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
-**Version:** 0.1.2
+**Version:** 0.1.3
 
 ---
 
