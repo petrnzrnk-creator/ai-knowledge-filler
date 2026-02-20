@@ -51,7 +51,7 @@ def err(msg: str) -> None:
 # ─── VALIDATE ─────────────────────────────────────────────────────────────────
 
 try:
-    from validate_yaml import validate_file as _validate_file, load_domains_from_taxonomy
+    from Scripts.validate_yaml import validate_file as _validate_file
     _FULL_VALIDATOR = True
 except ImportError:
     _FULL_VALIDATOR = False

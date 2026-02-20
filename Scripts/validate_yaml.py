@@ -25,6 +25,7 @@ import sys
 from datetime import datetime
 from typing import List, Tuple
 
+import re
 import yaml
 
 # Valid enum values
@@ -129,6 +130,11 @@ def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> 
     if "tags" in metadata and isinstance(metadata["tags"], list) and len(metadata["tags"]) < 3:
         warnings.append("Fewer than 3 tags (recommended: 3-10)")
 
+    if "related" in metadata and isinstance(metadata["related"], list):
+        for link in metadata["related"]:
+            if isinstance(link, str) and not re.match(r'^\[\[.+\]\]$', link.strip('"\' ')):
+                errors.append(f"Invalid WikiLink format in related: \'{link}\' — use [[...]] syntax")
+
     if "related" not in metadata or not metadata["related"]:
         warnings.append("No related links (recommended for knowledge graph)")
 
@@ -151,7 +157,7 @@ def _parse_frontmatter(content: str) -> Tuple[dict, List[str]]:
     return metadata, errors
 
 
-def validate_file(filepath: str) -> Tuple[List[str], List[str]]:
+def validate_file(filepath: str, strict: bool = False) -> Tuple[List[str], List[str]]:
     """Validate a single Markdown file's YAML frontmatter.
 
     Checks for:
@@ -201,6 +207,10 @@ def validate_file(filepath: str) -> Tuple[List[str], List[str]]:
         errors.append(f"YAML parsing error: {str(e)}")
     except Exception as e:
         errors.append(f"Unexpected error: {str(e)}")
+
+    if strict:
+        errors.extend(f"[strict] {w}" for w in warnings)
+        warnings = []
 
     return errors, warnings
 
