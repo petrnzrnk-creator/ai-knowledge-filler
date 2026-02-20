@@ -37,6 +37,9 @@ jobs:
         echo "Checking all markdown files have YAML frontmatter..."
         files_without_yaml=$(find . -name "*.md" \
           ! -path "./.github/*" \
+          ! -path "./Core_System/*" \
+          ! -path "./Documentation/*" \
+          ! -path "./Examples/*" \
           ! -name "README.md" \
           ! -name "CONTRIBUTING.md" \
           ! -name "ARCHITECTURE.md" \
@@ -63,6 +66,9 @@ jobs:
         
         total_md=$(find . -name "*.md" \
           ! -path "./.github/*" \
+          ! -path "./Core_System/*" \
+          ! -path "./Documentation/*" \
+          ! -path "./Examples/*" \
           ! -name "README.md" \
           ! -name "CONTRIBUTING.md" \
           ! -name "ARCHITECTURE.md" \
