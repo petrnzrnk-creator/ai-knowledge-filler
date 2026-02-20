@@ -46,3 +46,8 @@ htmlcov/
 .coverage
 *.txt
 .stversions/
+
+build/
+dist/
+*.egg-info/
+.obsidian/
