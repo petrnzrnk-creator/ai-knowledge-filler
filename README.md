@@ -44,8 +44,8 @@ akf generate "Create Docker security checklist"
 
 ```
 1. Open Claude.ai → Create new Project
-2. Project Knowledge → Upload Core_System/System_Prompt_AI_Knowledge_Filler.md
-3. Custom Instructions → Paste Core_System/Custom_Instructions.md
+2. Project Knowledge → Upload akf/system_prompt.md
+3. Custom Instructions → Paste akf/system_prompt.md
 4. Prompt: "Create guide on API authentication"
 5. Done. Claude generates structured files.
 ```
@@ -253,7 +253,7 @@ Create frameworks, methodologies, client reports.
 **4. Batch Processing**
 Generate multiple files programmatically via CLI or API.
 
-**Full examples:** [Use_Cases_Documentation.md](Documentation/Use_Cases_Documentation.md)
+**Full examples:** [Use_Cases_Documentation.md](docs/user-guide.md)
 
 ---
 
@@ -270,24 +270,24 @@ type: template     # Reusable template
 
 **30+ domains:** `api-design`, `system-design`, `devops`, `security`, `data-engineering`, etc.
 
-See [Domain_Taxonomy.md](Core_System/Domain_Taxonomy.md) for complete list.
+See [Domain_Taxonomy.md](docs/user-guide.md) for complete list.
 
 ---
 
 ## Documentation
 
 ### Core System
-- [System Prompt](Core_System/System_Prompt_AI_Knowledge_Filler.md) — LLM behavior definition
-- [Metadata Standard](Core_System/Metadata_Template_Standard.md) — YAML specification
-- [Domain Taxonomy](Core_System/Domain_Taxonomy.md) — Classification system
-- [Update Protocol](Core_System/File_Update_Protocol.md) — Merge rules
+- [System Prompt](akf/system_prompt.md) — LLM behavior definition
+- [Metadata Standard](docs/user-guide.md) — YAML specification
+- [Domain Taxonomy](docs/user-guide.md) — Classification system
+- [Update Protocol](docs/user-guide.md) — Merge rules
 
 ### Guides
 - [User Guide](docs/user-guide.md) — Installation, quick start, troubleshooting
 - [CLI Reference](docs/cli-reference.md) — All commands, flags, env vars, exit codes
-- [Deployment Guide](Documentation/Deployment_Guide.md) — Installation options
-- [Use Cases](Documentation/Use_Cases_Documentation.md) — 20+ scenarios
-- [Workflow](Core_System/Prompt_Engineering_Workflow.md) — 8-stage methodology
+- [Deployment Guide](docs/user-guide.md) — Installation options
+- [Use Cases](docs/user-guide.md) — 20+ scenarios
+- [Workflow](docs/user-guide.md) — 8-stage methodology
 
 ### Development
 - [Architecture](ARCHITECTURE.md) — Module map, data flow, extension points
@@ -306,7 +306,7 @@ from llm_providers import get_provider
 provider = get_provider("auto")
 
 # Load system prompt
-with open('Core_System/System_Prompt_AI_Knowledge_Filler.md') as f:
+with open('akf/system_prompt.md') as f:
     system_prompt = f.read()
 
 # Generate
