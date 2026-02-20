@@ -343,7 +343,7 @@ def main() -> None:
     all_files = glob.glob("**/*.md", recursive=True)
     md_files = [
         f for f in all_files
-        if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md"])
+        if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md", "ARCHITECTURE.md"])
     ]
 
     total_files = len(md_files)
