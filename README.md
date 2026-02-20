@@ -30,8 +30,9 @@
 ```bash
 pip install ai-knowledge-filler
 
-# Set at least one API key
-export ANTHROPIC_API_KEY="sk-ant-..."  # or GOOGLE_API_KEY, OPENAI_API_KEY
+# Set at least one API key — Groq is free and fastest to start
+export GROQ_API_KEY="gsk_..."          # free at console.groq.com (recommended)
+# export ANTHROPIC_API_KEY="sk-ant-..." # or any other provider
 
 # Generate
 akf generate "Create Docker security checklist"
@@ -101,10 +102,12 @@ akf validate
 akf models
 
 # Output:
-# ✅ claude     Claude (Anthropic) — claude-sonnet-4-20250514
-# ✅ gemini     Gemini (Google) — gemini-2.0-flash
-# ❌ gpt4       GPT-4 (OpenAI) — Set OPENAI_API_KEY
-# ✅ ollama     Ollama (llama3.2:3b)
+# ✅ groq      Groq — llama-3.3-70b-versatile
+# ❌ grok      Grok (xAI) — Set XAI_API_KEY
+# ✅ claude    Claude (Anthropic) — claude-sonnet-4-20250514
+# ✅ gemini    Gemini (Google) — gemini-3-flash-preview
+# ❌ gpt4      GPT-3.5 (OpenAI) — Set OPENAI_API_KEY
+# ✅ ollama    Ollama — llama3.2:3b
 ```
 
 ---
@@ -172,14 +175,16 @@ Production-Ready File
 
 ## Model Selection
 
-| Model | Speed | Cost | Best For |
-|-------|-------|------|----------|
-| **Claude** | Medium | $$$ | Technical docs, architecture |
-| **Gemini** | Fast | $ | Quick drafts, summaries |
-| **GPT-4** | Slow | $$$$ | Versatile content |
-| **Ollama** | Very Fast | Free | Privacy, offline, local |
+| Model | Key | Speed | Cost | Best For |
+|-------|-----|-------|------|----------|
+| **Groq** | `GROQ_API_KEY` | ⚡ Fastest | Free tier | First installs, CI, high volume |
+| **Grok** | `XAI_API_KEY` | Fast | $$ | General purpose |
+| **Claude** | `ANTHROPIC_API_KEY` | Medium | $$$ | Technical docs, architecture |
+| **Gemini** | `GOOGLE_API_KEY` | Fast | $ | Quick drafts, summaries |
+| **GPT-3.5** | `OPENAI_API_KEY` | Medium | $$ | Versatile content |
+| **Ollama** | — | Very Fast | Free | Privacy, offline, local |
 
-**Auto-selection:** CLI tries providers in order: Claude → Gemini → GPT-4 → Ollama (first available).
+**Auto-selection:** CLI tries providers in order: Groq → Grok → Claude → Gemini → GPT-4 → Ollama (first available).
 
 ---
 
@@ -202,16 +207,15 @@ pip install -r requirements.txt
 ### API Keys
 
 ```bash
-# Set at least one
-export ANTHROPIC_API_KEY="sk-ant-..."
-export GOOGLE_API_KEY="AIza..."
-export OPENAI_API_KEY="sk-..."
+# Set at least one (Groq recommended — free tier available)
+export GROQ_API_KEY="gsk_..."          # console.groq.com
+export XAI_API_KEY="xai-..."           # console.x.ai
+export ANTHROPIC_API_KEY="sk-ant-..."  # console.anthropic.com
+export GOOGLE_API_KEY="AIza..."        # aistudio.google.com
+export OPENAI_API_KEY="sk-..."         # platform.openai.com
 
-# Or create .env file
-cat > .env << 'EOF'
-ANTHROPIC_API_KEY=your-key-here
-GOOGLE_API_KEY=your-key-here
-EOF
+# Or add to ~/.bashrc / ~/.zshrc to persist across sessions:
+# export GROQ_API_KEY="gsk_..."
 ```
 
 ---
@@ -279,9 +283,15 @@ See [Domain_Taxonomy.md](Core_System/Domain_Taxonomy.md) for complete list.
 - [Update Protocol](Core_System/File_Update_Protocol.md) — Merge rules
 
 ### Guides
+- [User Guide](docs/user-guide.md) — Installation, quick start, troubleshooting
+- [CLI Reference](docs/cli-reference.md) — All commands, flags, env vars, exit codes
 - [Deployment Guide](Documentation/Deployment_Guide.md) — Installation options
 - [Use Cases](Documentation/Use_Cases_Documentation.md) — 20+ scenarios
 - [Workflow](Core_System/Prompt_Engineering_Workflow.md) — 8-stage methodology
+
+### Development
+- [Architecture](ARCHITECTURE.md) — Module map, data flow, extension points
+- [Contributing](CONTRIBUTING.md) — Dev setup, quality gates, adding providers
 
 ---
 

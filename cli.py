@@ -15,7 +15,12 @@ from llm_providers import get_provider, list_providers, PROVIDERS
 
 BASE_DIR = Path(__file__).parent.absolute()
 VAULT_PATH = Path("/storage/emulated/0/Download/WorkingprogressAKF_Vault")
-OUTPUT_DIR = VAULT_PATH / "04-DELIVERABLES" / "Code"
+OUTPUT_DIR = Path(
+    os.getenv(
+        "AKF_OUTPUT_DIR",
+        str(VAULT_PATH / "04-DELIVERABLES" / "Code"),
+    )
+)
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
 # ─── COLORS ───────────────────────────────────────────────────────────────────

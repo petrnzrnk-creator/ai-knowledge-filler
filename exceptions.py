@@ -57,10 +57,13 @@ class LLMError(AKFError):
 class ProviderUnavailableError(LLMError):
     """LLM provider not reachable or not configured."""
 
-    def __init__(self, provider: str) -> None:
+    def __init__(self, provider: str, reason: str = "") -> None:
+        ctx: dict[str, Any] = {"provider": provider}
+        if reason:
+            ctx["reason"] = reason
         super().__init__(
             f"Provider '{provider}' unavailable",
-            context={"provider": provider},
+            context=ctx,
         )
 
 
