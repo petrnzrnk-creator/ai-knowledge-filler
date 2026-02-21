@@ -3,7 +3,7 @@ Tests for AKF Phase 2.1 — ValidationError contract
 """
 
 import pytest
-from validation_error import (
+from akf.validation_error import (
     ValidationError, ErrorCode, Severity,
     missing_field, invalid_enum, invalid_date_format,
     type_mismatch, schema_violation, taxonomy_violation,

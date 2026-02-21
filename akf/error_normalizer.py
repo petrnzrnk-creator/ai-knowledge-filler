@@ -16,7 +16,7 @@ Rules:
 from dataclasses import dataclass
 from typing import Any
 
-from validation_error import ErrorCode, Severity, ValidationError
+from akf.validation_error import ErrorCode, Severity, ValidationError
 
 
 # ---------------------------------------------------------------------------

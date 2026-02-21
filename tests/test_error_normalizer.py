@@ -4,8 +4,8 @@ ADR-001: Validation Layer Architecture
 """
 
 import pytest
-from error_normalizer import normalize_errors, RetryPayload
-from validation_error import (
+from akf.error_normalizer import normalize_errors, RetryPayload
+from akf.validation_error import (
     ValidationError, ErrorCode, Severity,
     missing_field, invalid_enum, invalid_date_format,
     type_mismatch, schema_violation, taxonomy_violation,
