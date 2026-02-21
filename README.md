@@ -361,7 +361,7 @@ done < topics.txt
 
 ## Roadmap
 
-### v0.1.x ✅ (Current)
+### v0.1.x ✅ (Shipped)
 - [x] System Prompt (universal LLM compatibility)
 - [x] YAML Metadata Standard
 - [x] Domain Taxonomy (30+ domains)
@@ -370,7 +370,7 @@ done < topics.txt
 - [x] CI/CD Pipelines (GitHub Actions)
 - [x] PyPI package (`pip install ai-knowledge-filler`)
 
-### v0.2.x (Next)
+### v0.2.x ✅ (Current)
 - [x] Validation pipeline (Phase 2.1 — ValidationError, Error Normalizer, Retry Controller, Commit Gate)
 - [ ] Obsidian vault auto-routing
 - [ ] Local model support (llama.cpp endpoint)

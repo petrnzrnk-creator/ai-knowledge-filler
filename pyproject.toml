@@ -1,6 +1,6 @@
 [project]
 name = "ai-knowledge-filler"
-version = "0.1.4"
+version = "0.2.0"
 description = "Knowledge engineering system — transforms LLMs into deterministic Obsidian file generators"
 readme = "README.md"
 license = "MIT"
