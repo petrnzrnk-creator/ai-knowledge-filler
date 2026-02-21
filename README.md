@@ -1,6 +1,6 @@
 # AI Knowledge Filler
 
-**Transform any LLM into a deterministic knowledge base generator**
+**Deterministic knowledge compiler for LLM output**
 
 [![Tests](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Tests/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
 [![Lint](https://github.com/petrnzrnk-creator/ai-knowledge-filler/workflows/Lint/badge.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/lint.yml)

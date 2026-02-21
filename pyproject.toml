@@ -1,7 +1,7 @@
 [project]
 name = "ai-knowledge-filler"
 version = "0.2.0"
-description = "Knowledge engineering system — transforms LLMs into deterministic Obsidian file generators"
+description = "Deterministic knowledge compiler for LLM output"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
