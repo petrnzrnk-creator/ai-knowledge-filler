@@ -63,7 +63,7 @@ akf generate "Create Docker security checklist"
 - **CLI** — Multi-LLM interface (Claude, Gemini, GPT-4, Ollama)
 
 ### Quality Assurance
-- ✅ 96% test coverage (82 tests)
+- ✅ 96% test coverage (104 tests)
 - ✅ Automated YAML validation
 - ✅ CI/CD pipelines (GitHub Actions)
 - ✅ Type hints (100% coverage)
@@ -347,7 +347,7 @@ done < topics.txt
 - [x] System Prompt (universal LLM compatibility)
 - [x] YAML Metadata Standard
 - [x] Domain Taxonomy (30+ domains)
-- [x] Validation Script (96% test coverage, 82 tests)
+- [x] Validation Script (96% test coverage, 104 tests)
 - [x] Multi-LLM CLI (Claude, Gemini, GPT-4, Ollama)
 - [x] CI/CD Pipelines (GitHub Actions)
 - [x] PyPI package (`pip install ai-knowledge-filler`)
@@ -380,7 +380,7 @@ LLMs are **deterministic infrastructure**, not conversational toys.
 **Created by:** Petr — AI Solutions Architect
 **PyPI:** https://pypi.org/project/ai-knowledge-filler/
 **Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
-**Version:** 0.1.3
+**Version:** 0.1.4
 
 ---
 
