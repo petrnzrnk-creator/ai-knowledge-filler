@@ -8,7 +8,7 @@
 [![PyPI](https://img.shields.io/pypi/v/ai-knowledge-filler.svg)](https://pypi.org/project/ai-knowledge-filler/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
 [![Pylint](https://img.shields.io/badge/pylint-9.55%2F10-brightgreen)](https://github.com/petrnzrnk-creator/ai-knowledge-filler)
 
 ---
@@ -63,7 +63,7 @@ akf generate "Create Docker security checklist"
 - **CLI** — Multi-LLM interface (Claude, Gemini, GPT-4, Ollama)
 
 ### Quality Assurance
-- ✅ 96% test coverage (104 tests)
+- ✅ 97% test coverage (165 tests)
 - ✅ Automated YAML validation
 - ✅ CI/CD pipelines (GitHub Actions)
 - ✅ Type hints (100% coverage)
@@ -171,6 +171,24 @@ Production-Ready File
 
 **Key Insight:** System prompt is the source of truth. Same prompt works across all LLMs.
 
+### Validation Pipeline (Phase 2.1)
+
+```
+LLM Output
+    ↓
+Validation Engine  ← deterministic
+    ↓
+Error Normalizer   ← deterministic
+    ↓
+Retry Controller   ← non-deterministic (LLM, max 3 attempts)
+    ↓
+Commit Gate        ← deterministic (schema_version + atomic write)
+    ↓
+Vault File
+```
+
+**Determinism boundary:** LLM is the only non-deterministic component.
+
 ---
 
 ## Model Selection
@@ -233,7 +251,7 @@ akf validate
 pylint *.py tests/
 ```
 
-**Coverage:** 96% (82 tests)
+**Coverage:** 97% (165 tests)
 **Linting:** Pylint 9.55/10
 **CI/CD:** All checks passing
 
@@ -353,6 +371,7 @@ done < topics.txt
 - [x] PyPI package (`pip install ai-knowledge-filler`)
 
 ### v0.2.x (Next)
+- [x] Validation pipeline (Phase 2.1 — ValidationError, Error Normalizer, Retry Controller, Commit Gate)
 - [ ] Obsidian vault auto-routing
 - [ ] Local model support (llama.cpp endpoint)
 - [ ] Enhanced documentation
@@ -380,7 +399,7 @@ LLMs are **deterministic infrastructure**, not conversational toys.
 **Created by:** Petr — AI Solutions Architect
 **PyPI:** https://pypi.org/project/ai-knowledge-filler/
 **Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
-**Version:** 0.1.4
+**Version:** 0.2.0
 
 ---
 
