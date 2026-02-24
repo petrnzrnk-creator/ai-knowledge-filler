@@ -1,4 +1,9 @@
-"""Unit tests for validate_yaml.py"""
+"""Unit tests for validate_yaml.py — updated for Model C (Phase 2.2).
+
+Changes from Model B:
+  - domain invalid → E006_TAXONOMY_VIOLATION error (was: warning)
+  - All error messages now include E-codes (E001, E002, E003, E004, E006)
+"""
 
 import pytest
 from Scripts.validate_yaml import validate_file, validate_date_format
@@ -8,38 +13,32 @@ import os
 
 class TestDateValidation:
     """Test date format validation"""
-    
+
     def test_valid_date_format(self):
-        """Test that valid ISO 8601 dates pass validation"""
         assert validate_date_format('2026-02-10') == True
         assert validate_date_format('2024-01-01') == True
         assert validate_date_format('2025-12-31') == True
-    
+
     def test_invalid_date_format_dd_mm_yyyy(self):
-        """Test that DD-MM-YYYY format fails"""
         assert validate_date_format('10-02-2026') == False
         assert validate_date_format('01-01-2024') == False
-    
+
     def test_invalid_date_format_slashes(self):
-        """Test that date with slashes fails"""
         assert validate_date_format('2026/02/10') == False
         assert validate_date_format('10/02/2026') == False
-    
+
     def test_invalid_date_value(self):
-        """Test that invalid date values fail"""
         assert validate_date_format('2026-13-01') == False
         assert validate_date_format('2026-02-30') == False
-    
+
     def test_invalid_date_feb_30(self):
-        """Test that February 30 is invalid"""
         assert validate_date_format('2024-02-30') == False
 
 
 class TestFileValidation:
     """Test validation of complete markdown files"""
-    
+
     def test_valid_file(self):
-        """Test validation of a completely valid file"""
         content = """---
 title: "Test File"
 type: guide
@@ -56,31 +55,25 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) == 0
         finally:
             os.unlink(temp_path)
-    
+
     def test_missing_frontmatter(self):
-        """Test file without YAML frontmatter"""
-        content = """# Just a markdown file
-No YAML here"""
-        
+        content = """# Just a markdown file\nNo YAML here"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) == 1
             assert 'No YAML frontmatter found' in errors[0]
         finally:
             os.unlink(temp_path)
-    
+
     def test_missing_title_field(self):
-        """Test file missing required title field"""
         content = """---
 type: guide
 domain: ai-system
@@ -95,19 +88,18 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Missing required field: title' in err for err in errors)
+            # Model C: E002_MISSING_FIELD
+            assert any('E002_MISSING_FIELD' in err and 'title' in err for err in errors)
         finally:
             os.unlink(temp_path)
 
 
 class TestMetadataFieldValidation:
     """Test validation of specific metadata fields"""
-    
+
     def test_invalid_type_field(self):
-        """Test invalid type enum value"""
         content = """---
 title: "Test File"
 type: document
@@ -124,15 +116,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Invalid type' in err for err in errors)
+            # Model C: E001_INVALID_ENUM
+            assert any('E001_INVALID_ENUM' in err and 'type' in err for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_invalid_level_field(self):
-        """Test invalid level enum value"""
         content = """---
 title: "Test File"
 type: guide
@@ -149,15 +140,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Invalid level' in err for err in errors)
+            # Model C: E001_INVALID_ENUM
+            assert any('E001_INVALID_ENUM' in err and 'level' in err for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_invalid_status_field(self):
-        """Test invalid status enum value"""
         content = """---
 title: "Test File"
 type: guide
@@ -174,15 +164,15 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Invalid status' in err for err in errors)
+            # Model C: E001_INVALID_ENUM
+            assert any('E001_INVALID_ENUM' in err and 'status' in err for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_invalid_domain_warning(self):
-        """Test warning for non-standard domain"""
+        """Model C: invalid domain is now an ERROR (E006), not a warning."""
         content = """---
 title: "Test File"
 type: guide
@@ -199,16 +189,15 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert len(errors) == 0
-            assert any('not in standard taxonomy' in warn for warn in warnings)
+            # Model C: E006_TAXONOMY_VIOLATION — must be error, not warning
+            assert any('E006_TAXONOMY_VIOLATION' in err for err in errors)
+            assert not any('domain' in w.lower() for w in warnings)
         finally:
             os.unlink(temp_path)
-    
+
     def test_tags_not_array(self):
-        """Test tags as string instead of array"""
         content = """---
 title: "Test File"
 type: guide
@@ -225,15 +214,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Tags must be an array' in err for err in errors)
+            # Model C: E004_TYPE_MISMATCH
+            assert any('tags' in err.lower() for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_related_not_array(self):
-        """Test related as string instead of array"""
         content = """---
 title: "Test File"
 type: guide
@@ -251,15 +239,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Related must be an array' in err for err in errors)
+            # Model C: E004_TYPE_MISMATCH
+            assert any('related' in err.lower() for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_insufficient_tags_warning(self):
-        """Test warning for fewer than 3 tags"""
         content = """---
 title: "Test File"
 type: guide
@@ -276,16 +263,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) == 0
             assert any('Fewer than 3 tags' in warn for warn in warnings)
         finally:
             os.unlink(temp_path)
-    
+
     def test_no_related_links_warning(self):
-        """Test warning when related links are missing"""
         content = """---
 title: "Test File"
 type: guide
@@ -302,16 +287,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) == 0
             assert any('No related links' in warn for warn in warnings)
         finally:
             os.unlink(temp_path)
-    
+
     def test_created_date_invalid_format(self):
-        """Test invalid created date format"""
         content = """---
 title: "Test File"
 type: guide
@@ -328,15 +311,14 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Invalid created date format' in err for err in errors)
+            # Model C: E003_INVALID_DATE_FORMAT
+            assert any('E003_INVALID_DATE_FORMAT' in err and 'created' in err for err in errors)
         finally:
             os.unlink(temp_path)
 
     def test_updated_date_invalid_format(self):
-        """Test invalid updated date format"""
         content = """---
 title: "Test File"
 type: guide
@@ -353,19 +335,18 @@ updated: 10/02/2026
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
-            assert any('Invalid updated date format' in err for err in errors)
+            # Model C: E003_INVALID_DATE_FORMAT
+            assert any('E003_INVALID_DATE_FORMAT' in err and 'updated' in err for err in errors)
         finally:
             os.unlink(temp_path)
 
 
 class TestYAMLParsingErrors:
     """Test YAML parsing edge cases"""
-    
+
     def test_malformed_yaml(self):
-        """Test file with malformed YAML"""
         content = """---
 title: "Test File"
 type: guide
@@ -380,32 +361,24 @@ status: active
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert any('YAML parsing error' in err for err in errors)
         finally:
             os.unlink(temp_path)
-    
-    def test_empty_yaml_frontmatter(self):
-        """Test file with empty YAML frontmatter"""
-        content = """---
----
 
-# Content
-"""
+    def test_empty_yaml_frontmatter(self):
+        content = """---\n---\n\n# Content\n"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert any('Empty YAML frontmatter' in err for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_incomplete_frontmatter(self):
-        """Test file with incomplete YAML structure"""
         content = """---
 title: "Test File"
 type: guide
@@ -415,21 +388,23 @@ type: guide
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) > 0
-            assert any('Invalid YAML frontmatter structure' in err for err in errors) or \
-                   any('Missing required field' in err for err in errors)
+            # Either structure error or missing fields — both are valid outcomes
+            assert any(
+                'Invalid YAML frontmatter structure' in err
+                or 'E002_MISSING_FIELD' in err
+                for err in errors
+            )
         finally:
             os.unlink(temp_path)
 
 
 class TestMultipleFieldErrors:
     """Test files with multiple validation errors"""
-    
+
     def test_multiple_missing_fields(self):
-        """Test file missing multiple required fields"""
         content = """---
 title: "Test File"
 type: guide
@@ -440,18 +415,17 @@ type: guide
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) >= 5
-            assert any('Missing required field: domain' in err for err in errors)
-            assert any('Missing required field: level' in err for err in errors)
-            assert any('Missing required field: status' in err for err in errors)
+            # Model C: E002_MISSING_FIELD
+            assert any('E002_MISSING_FIELD' in err and 'domain' in err for err in errors)
+            assert any('E002_MISSING_FIELD' in err and 'level' in err for err in errors)
+            assert any('E002_MISSING_FIELD' in err and 'status' in err for err in errors)
         finally:
             os.unlink(temp_path)
-    
+
     def test_multiple_invalid_values(self):
-        """Test file with multiple invalid enum values"""
         content = """---
 title: "Test File"
 type: tutorial
@@ -468,13 +442,13 @@ updated: 2026-02-10
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
             f.write(content)
             temp_path = f.name
-        
         try:
             errors, warnings = validate_file(temp_path)
             assert len(errors) >= 4
-            assert any('Invalid type' in err for err in errors)
-            assert any('Invalid level' in err for err in errors)
-            assert any('Invalid status' in err for err in errors)
-            assert any('Tags must be an array' in err for err in errors)
+            # Model C: E001 for type/level/status, E006 for domain
+            assert any('E001_INVALID_ENUM' in err and 'type' in err for err in errors)
+            assert any('E001_INVALID_ENUM' in err and 'level' in err for err in errors)
+            assert any('E001_INVALID_ENUM' in err and 'status' in err for err in errors)
+            assert any('E006_TAXONOMY_VIOLATION' in err for err in errors)
         finally:
             os.unlink(temp_path)

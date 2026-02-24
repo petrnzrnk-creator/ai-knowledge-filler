@@ -5,6 +5,12 @@ This module validates Markdown files against the Metadata Template Standard
 defined in the AI Knowledge Filler system. It checks for required fields,
 valid enum values, proper date formats, and structural compliance.
 
+Model C (Phase 2.2): Hard enum enforcement for all taxonomy fields.
+  - domain  → E006_TAXONOMY_VIOLATION (was: warning)
+  - type    → E001_INVALID_ENUM
+  - level   → E001_INVALID_ENUM
+  - status  → E001_INVALID_ENUM
+
 Example:
     Run validation on all Markdown files in the repository::
 
@@ -42,7 +48,7 @@ VALID_TYPES = [
 VALID_LEVELS = ["beginner", "intermediate", "advanced"]
 VALID_STATUSES = ["draft", "active", "completed", "archived"]
 
-# Valid domains (extend as needed)
+# Valid domains (Domain_Taxonomy — canonical source)
 VALID_DOMAINS = [
     "ai-system",
     "system-design",
@@ -89,43 +95,62 @@ def validate_date_format(date_str: str) -> bool:
 
 
 def _validate_enum_fields(metadata: dict, errors: List[str], warnings: List[str]) -> None:
-    """Validate enum fields: type, level, status, domain."""
+    """Validate enum fields: type, level, status, domain.
+
+    Model C — Hard Enum Enforcement (Phase 2.2):
+      All four taxonomy fields produce errors on invalid values.
+      domain uses E006_TAXONOMY_VIOLATION; others use E001_INVALID_ENUM.
+    """
+    # E001_INVALID_ENUM — type
     if "type" in metadata and metadata["type"] not in VALID_TYPES:
         errors.append(
-            f"Invalid type: {metadata['type']}. " f"Must be one of: {', '.join(VALID_TYPES)}"
+            f"E001_INVALID_ENUM: type '{metadata['type']}' is not valid. "
+            f"Must be one of: {', '.join(VALID_TYPES)}"
         )
 
+    # E001_INVALID_ENUM — level
     if "level" in metadata and metadata["level"] not in VALID_LEVELS:
         errors.append(
-            f"Invalid level: {metadata['level']}. " f"Must be one of: {', '.join(VALID_LEVELS)}"
+            f"E001_INVALID_ENUM: level '{metadata['level']}' is not valid. "
+            f"Must be one of: {', '.join(VALID_LEVELS)}"
         )
 
+    # E001_INVALID_ENUM — status
     if "status" in metadata and metadata["status"] not in VALID_STATUSES:
         errors.append(
-            f"Invalid status: {metadata['status']}. " f"Must be one of: {', '.join(VALID_STATUSES)}"
+            f"E001_INVALID_ENUM: status '{metadata['status']}' is not valid. "
+            f"Must be one of: {', '.join(VALID_STATUSES)}"
         )
 
+    # E006_TAXONOMY_VIOLATION — domain (Model C: promoted from warning to error)
     if "domain" in metadata and metadata["domain"] not in VALID_DOMAINS:
-        warnings.append(f"Domain '{metadata['domain']}' not in standard taxonomy")
+        errors.append(
+            f"E006_TAXONOMY_VIOLATION: domain '{metadata['domain']}' not in taxonomy. "
+            f"Must be one of: {', '.join(VALID_DOMAINS)}"
+        )
 
 
 def _validate_dates(metadata: dict, errors: List[str]) -> None:
     """Validate created and updated date fields."""
     if "created" in metadata and not validate_date_format(metadata["created"]):
-        errors.append(f"Invalid created date format: {metadata['created']}. Use YYYY-MM-DD")
+        errors.append(
+            f"E003_INVALID_DATE_FORMAT: created '{metadata['created']}'. Use YYYY-MM-DD"
+        )
 
     if "updated" in metadata and not validate_date_format(metadata["updated"]):
-        errors.append(f"Invalid updated date format: {metadata['updated']}. Use YYYY-MM-DD")
+        errors.append(
+            f"E003_INVALID_DATE_FORMAT: updated '{metadata['updated']}'. Use YYYY-MM-DD"
+        )
 
 
 def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> None:
     """Validate tags and related array fields."""
     if "tags" in metadata and not isinstance(metadata["tags"], list):
-        errors.append("Tags must be an array")
+        errors.append("E004_TYPE_MISMATCH: tags must be an array")
 
     if "related" in metadata and metadata["related"] is not None:
         if not isinstance(metadata["related"], list):
-            errors.append("Related must be an array or null")
+            errors.append("E004_TYPE_MISMATCH: related must be an array or null")
 
     if "tags" in metadata and isinstance(metadata["tags"], list) and len(metadata["tags"]) < 3:
         warnings.append("Fewer than 3 tags (recommended: 3-10)")
@@ -133,7 +158,10 @@ def _validate_arrays(metadata: dict, errors: List[str], warnings: List[str]) -> 
     if "related" in metadata and isinstance(metadata["related"], list):
         for link in metadata["related"]:
             if isinstance(link, str) and not re.match(r'^\[\[.+\]\]$', link.strip('"\' ')):
-                errors.append(f"Invalid WikiLink format in related: \'{link}\' — use [[...]] syntax")
+                errors.append(
+                    f"E005_SCHEMA_VIOLATION: invalid WikiLink format in related: "
+                    f"'{link}' — use [[...]] syntax"
+                )
 
     if "related" not in metadata or not metadata["related"]:
         warnings.append("No related links (recommended for knowledge graph)")
@@ -162,18 +190,21 @@ def validate_file(filepath: str, strict: bool = False) -> Tuple[List[str], List[
 
     Checks for:
         - Presence of YAML frontmatter
-        - All required metadata fields
-        - Valid enum values for type, level, status, domain
-        - Correct date formats (ISO 8601)
-        - Proper data types (arrays for tags/related)
+        - All required metadata fields (E002_MISSING_FIELD)
+        - Hard enum enforcement: type, level, status (E001_INVALID_ENUM)
+        - Hard taxonomy enforcement: domain (E006_TAXONOMY_VIOLATION)
+        - Correct date formats ISO 8601 (E003_INVALID_DATE_FORMAT)
+        - Proper data types for tags/related (E004_TYPE_MISMATCH)
+        - WikiLink format in related (E005_SCHEMA_VIOLATION)
 
     Args:
         filepath: Path to the Markdown file to validate.
+        strict: If True, warnings are promoted to errors.
 
     Returns:
         A tuple containing two lists:
-            - errors: Critical validation failures
-            - warnings: Non-critical issues and best practice violations
+            - errors: Critical validation failures (block commit)
+            - warnings: Non-critical issues (logged only)
 
     Example:
         >>> errors, warnings = validate_file("example.md")
@@ -197,7 +228,7 @@ def validate_file(filepath: str, strict: bool = False) -> Tuple[List[str], List[
         required_fields = ["title", "type", "domain", "level", "status", "created", "updated"]
         for field in required_fields:
             if field not in metadata:
-                errors.append(f"Missing required field: {field}")
+                errors.append(f"E002_MISSING_FIELD: required field '{field}' is absent")
 
         _validate_enum_fields(metadata, errors, warnings)
         _validate_dates(metadata, errors)
@@ -231,7 +262,7 @@ def main() -> None:
 
         ✅ example.md
         ❌ invalid.md
-           ERROR: Missing required field: title
+           ERROR: E006_TAXONOMY_VIOLATION: domain 'backend' not in taxonomy...
 
         📊 Validation Summary:
            Total files: 2
@@ -243,7 +274,8 @@ def main() -> None:
     all_files = glob.glob("**/*.md", recursive=True)
 
     md_files = [
-        f for f in all_files if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md", "ARCHITECTURE.md"])
+        f for f in all_files
+        if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md", "ARCHITECTURE.md"])
     ]
 
     total_files = len(md_files)

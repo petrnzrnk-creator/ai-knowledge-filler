@@ -227,7 +227,7 @@ class GeminiProvider(LLMProvider):
                 model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=system_prompt, temperature=0.7
+                    system_instruction=system_prompt, temperature=0
                 ),
             )
             content = response.text
@@ -300,7 +300,7 @@ class OpenAIProvider(LLMProvider):
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=4096,
-                temperature=0.7,
+                temperature=0,
             )
             content = response.choices[0].message.content
             if not content:
@@ -443,7 +443,7 @@ class GroqProvider(LLMProvider):
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=4096,
-                temperature=0.7,
+                temperature=0,
             )
             content = response.choices[0].message.content
             if not content:
@@ -515,7 +515,7 @@ class XAIProvider(LLMProvider):
                     {"role": "user", "content": prompt},
                 ],
                 max_tokens=4096,
-                temperature=0.7,
+                temperature=0,
             )
             content = response.choices[0].message.content
             if not content:
