@@ -7,6 +7,7 @@ import sys
 import os
 import re
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
 from llm_providers import get_provider, list_providers, PROVIDERS
@@ -17,7 +18,10 @@ BASE_DIR = Path(__file__).parent.absolute()
 OUTPUT_DIR = Path(os.getenv("AKF_OUTPUT_DIR", "."))
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
-# Paths excluded from validation (mirror validate_yaml.EXCLUDE_PATTERNS)
+# Telemetry writer path (repo, not vault — ADR-001 Decision 9)
+TELEMETRY_PATH = Path(os.getenv("AKF_TELEMETRY_PATH", "telemetry/events.jsonl"))
+
+
 CLI_EXCLUDE_PATTERNS = [
     ".github",
     "README.md",
@@ -162,7 +166,19 @@ def save_file(content: str, filename: str, output_dir: Path) -> Path:
 
 
 def cmd_generate(args: argparse.Namespace) -> None:
-    """Generate knowledge file using selected LLM provider."""
+    """Generate knowledge file using selected LLM provider.
+
+    Pipeline (Phase 2.3):
+      1. Generate initial content via LLM
+      2. Validate → run_retry_loop if errors
+      3. commit() → atomic write
+      4. Telemetry emitted by RetryController + CommitGate automatically
+    """
+    from akf.telemetry import TelemetryWriter, new_generation_id
+    from akf.retry_controller import run_retry_loop
+    from akf.commit_gate import commit as akf_commit
+    from akf.validator import validate
+
     # Get provider
     try:
         provider = get_provider(args.model)
@@ -173,26 +189,110 @@ def cmd_generate(args: argparse.Namespace) -> None:
     system_prompt = load_system_prompt()
     info(f'Generating via {provider.display_name}...')
 
-    # Generate content
+    # ── Telemetry setup ───────────────────────────────────────────────────────
+    generation_id = new_generation_id()
+    writer = TelemetryWriter(path=TELEMETRY_PATH)
+    t_start = time.monotonic()
+
+    # ── Initial generation ────────────────────────────────────────────────────
     try:
+        t0 = time.monotonic()
         content = provider.generate(args.prompt, system_prompt)
+        initial_duration_ms = int((time.monotonic() - t0) * 1000)
     except Exception as e:
         err(f"Generation error: {e}")
         sys.exit(1)
 
-    # Save file
+    # ── Determine output path ─────────────────────────────────────────────────
     out_dir = Path(args.output) if args.output else OUTPUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
     filename = extract_filename(content, args.prompt)
-    saved_path = save_file(content, filename, out_dir)
+    output_path = out_dir / filename
+    if output_path.exists():
+        ts = datetime.now().strftime("%H%M%S")
+        output_path = out_dir / f"{output_path.stem}_{ts}.md"
 
-    ok(f"Saved to: {saved_path}")
+    document_id = output_path.stem
 
-    # Auto-validate
-    errors, _ = validate_file(str(saved_path))
-    if not errors:
+    # ── Initial validation ────────────────────────────────────────────────────
+    try:
+        initial_errors = validate(content)
+    except Exception:
+        initial_errors = []
+
+    blocking = [e for e in initial_errors if e.severity.value == "error"]
+
+    # ── Retry loop (if needed) ────────────────────────────────────────────────
+    rejected_candidates: list[str] = []
+    total_attempts = 0
+
+    if blocking:
+        def generate_fn(doc: str, retry_prompt: str) -> str:
+            return provider.generate(retry_prompt, system_prompt)
+
+        def validate_fn(doc: str) -> list:
+            try:
+                return validate(doc)
+            except Exception:
+                return []
+
+        retry_result = run_retry_loop(
+            document=content,
+            errors=blocking,
+            generate_fn=generate_fn,
+            validate_fn=validate_fn,
+            generation_id=generation_id,
+            document_id=document_id,
+            schema_version="1.0.0",
+            model=provider.model_name,
+            temperature=0,
+            top_p=1,
+            writer=writer,
+        )
+        content = retry_result.document
+        total_attempts = retry_result.attempts
+
+        # Collect rejected domain candidates from retry errors
+        for e in retry_result.errors:
+            if e.field == "domain" and e.received:
+                rejected_candidates.append(str(e.received))
+    else:
+        total_attempts = 1
+
+    total_duration_ms = int((time.monotonic() - t_start) * 1000)
+
+    # ── Commit ────────────────────────────────────────────────────────────────
+    final_errors = []
+    try:
+        final_errors = validate(content)
+    except Exception:
+        pass
+
+    commit_result = akf_commit(
+        document=content,
+        output_path=output_path,
+        errors=final_errors,
+        generation_id=generation_id,
+        document_id=document_id,
+        schema_version="1.0.0",
+        total_attempts=total_attempts,
+        rejected_candidates=rejected_candidates,
+        model=provider.model_name,
+        temperature=0,
+        total_duration_ms=total_duration_ms,
+        writer=writer,
+    )
+
+    # ── Output ────────────────────────────────────────────────────────────────
+    if commit_result.committed:
+        ok(f"Saved to: {commit_result.path}")
         ok("Validation passed!")
     else:
-        warn(f"Validation found {len(errors)} issues.")
+        # Fallback: save anyway (pre-Phase 2.3 behaviour) and warn
+        saved_path = save_file(content, filename, out_dir)
+        ok(f"Saved to: {saved_path}")
+        warn(f"Validation found {len(commit_result.blocking_errors)} issues.")
+
 
 
 # ─── MODELS ───────────────────────────────────────────────────────────────────
