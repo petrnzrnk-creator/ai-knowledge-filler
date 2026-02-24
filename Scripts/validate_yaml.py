@@ -71,6 +71,15 @@ VALID_DOMAINS = [
     "data-science",
 ]
 
+# Paths excluded from validation
+EXCLUDE_PATTERNS = [
+    ".github",
+    "README.md",
+    "CONTRIBUTING.md",
+    "ARCHITECTURE.md",
+    "08-TEMPLATES",  # Obsidian Templater files — not knowledge documents
+]
+
 
 def validate_date_format(date_str: str) -> bool:
     """Validate that a date string is in ISO 8601 format (YYYY-MM-DD).
@@ -249,7 +258,7 @@ def validate_file(filepath: str, strict: bool = False) -> Tuple[List[str], List[
 def main() -> None:
     """Execute validation on all Markdown files in the repository.
 
-    Scans for .md files recursively, excludes system files (README, .github),
+    Scans for .md files recursively, excludes system files and template folders,
     validates each file, and outputs results with color-coded status indicators.
 
     Exit codes:
@@ -275,7 +284,7 @@ def main() -> None:
 
     md_files = [
         f for f in all_files
-        if not any(x in f for x in [".github", "README.md", "CONTRIBUTING.md", "ARCHITECTURE.md"])
+        if not any(x in f for x in EXCLUDE_PATTERNS)
     ]
 
     total_files = len(md_files)

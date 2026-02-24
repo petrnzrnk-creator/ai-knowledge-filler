@@ -17,6 +17,13 @@ BASE_DIR = Path(__file__).parent.absolute()
 OUTPUT_DIR = Path(os.getenv("AKF_OUTPUT_DIR", "."))
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
 
+# Paths excluded from validation (mirror validate_yaml.EXCLUDE_PATTERNS)
+CLI_EXCLUDE_PATTERNS = [
+    ".github",
+    "README.md",
+    "08-TEMPLATES",  # Obsidian Templater files — not knowledge documents
+]
+
 # ─── COLORS ───────────────────────────────────────────────────────────────────
 
 GREEN = "\033[0;32m"
@@ -85,7 +92,7 @@ def cmd_validate(args: argparse.Namespace) -> None:
     else:
         files = glob.glob("**/*.md", recursive=True)
 
-    files = [f for f in files if not any(x in f for x in [".github", "README.md"])]
+    files = [f for f in files if not any(x in f for x in CLI_EXCLUDE_PATTERNS)]
 
     strict = getattr(args, "strict", False)
     mode = " [STRICT]" if strict else ""
@@ -194,7 +201,7 @@ def cmd_generate(args: argparse.Namespace) -> None:
 def cmd_models(args: argparse.Namespace) -> None:
     """List available LLM providers."""
     providers = list_providers()
-    
+
     info("Available LLM providers:\n")
     for name, available in providers.items():
         provider = PROVIDERS[name]()
@@ -241,7 +248,7 @@ def main() -> int:
     val.add_argument("--path", "-p", help="Validate all .md files in folder")
     val.add_argument("--strict", "-s", action="store_true",
                      help="Promote warnings to errors")
-    
+
     # Models command
     models = sub.add_parser("models", help="List available LLM providers")
 
