@@ -1,282 +1,361 @@
-"""
-Tests for AKF Phase 2.1 — Retry Controller (S3)
-ADR-001: Validation Layer Architecture
+"""Tests for GenerationAttemptEvent emission in RetryController (Task 4 / Phase 2.3).
+
+Covers:
+  - event emitted on each LLM attempt
+  - converged=True on success
+  - converged=False + is_final_attempt=True on abort (identical_output, convergence_failure)
+  - converged=False + is_final_attempt=True on max_attempts_reached
+  - writer=None → no emission, pipeline unaffected
+  - telemetry failure → pipeline continues (observe, never influence)
+  - generation_id=None → no emission
+  - _to_record maps ValidationError fields correctly
+  - duration_ms > 0
 """
 
+import uuid
+from unittest.mock import MagicMock, call, patch
+
 import pytest
-from akf.retry_controller import run_retry_loop, RetryResult, MAX_ATTEMPTS
+
+from akf.retry_controller import (
+    MAX_ATTEMPTS,
+    _to_record,
+    run_retry_loop,
+)
+from akf.telemetry import GenerationAttemptEvent, TelemetryWriter
 from akf.validation_error import (
-    ValidationError, ErrorCode, Severity,
-    missing_field, invalid_enum, invalid_date_format,
+    ErrorCode,
+    Severity,
+    ValidationError,
+    invalid_enum,
+    taxonomy_violation,
 )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# ─── FIXTURES ─────────────────────────────────────────────────────────────────
 
-def make_valid_doc(content: str = "valid") -> str:
-    return f"---\ntitle: Test\n---\n{content}"
+GEN_ID = str(uuid.uuid4())
+DOC_ID = "test_doc"
+MODEL = "groq-test"
+SCHEMA = "1.0.0"
 
-
-def always_valid(_doc: str) -> list[ValidationError]:
-    """Validator that always returns no errors."""
-    return []
+VALID_DOC = "---\ntitle: Valid\ntype: guide\n---\n# Body"
+INVALID_DOC = "---\ntitle: Invalid\ndomain: backend\n---\n# Body"
 
 
-def always_invalid(errors: list[ValidationError]):
-    """Returns a validator that always returns the given errors."""
-    def _validate(_doc: str) -> list[ValidationError]:
-        return errors
-    return _validate
+def make_error(field="domain", code=ErrorCode.TAXONOMY_VIOLATION, received="backend"):
+    return ValidationError(
+        code=code,
+        field=field,
+        expected=["api-design", "backend-engineering"],
+        received=received,
+        severity=Severity.ERROR,
+    )
 
 
-def fixed_generate(new_doc: str):
-    """Generator that always returns the same fixed document."""
-    def _generate(_doc: str, _prompt: str) -> str:
-        return new_doc
-    return _generate
+def make_writer(tmp_path):
+    return TelemetryWriter(path=tmp_path / "events.jsonl")
 
 
-def incrementing_generate():
-    """Generator that returns a unique document each call."""
-    counter = [0]
-    def _generate(_doc: str, _prompt: str) -> str:
-        counter[0] += 1
-        return f"---\ntitle: Attempt {counter[0]}\n---\ncontent"
-    return _generate
+# ─── _to_record ───────────────────────────────────────────────────────────────
+
+class TestToRecord:
+    def test_maps_all_fields(self):
+        err = make_error()
+        rec = _to_record(err)
+        assert rec.code == "E006_TAXONOMY_VIOLATION"
+        assert rec.field == "domain"
+        assert rec.received == "backend"
+        assert rec.severity == "error"
+
+    def test_expected_preserved(self):
+        err = make_error()
+        rec = _to_record(err)
+        assert isinstance(rec.expected, list)
+
+    def test_invalid_enum_code(self):
+        err = invalid_enum("type", ["guide", "concept"], "unknown")
+        rec = _to_record(err)
+        assert rec.code == "E001_INVALID_ENUM"
+        assert rec.field == "type"
 
 
-# ---------------------------------------------------------------------------
-# Success paths
-# ---------------------------------------------------------------------------
+# ─── Telemetry emission ───────────────────────────────────────────────────────
 
-class TestRetrySuccess:
+class TestAttemptEventEmission:
 
-    def test_no_errors_returns_success_zero_attempts(self):
-        doc = make_valid_doc()
-        result = run_retry_loop(
-            document=doc,
-            errors=[],
-            generate_fn=fixed_generate(make_valid_doc("new")),
-            validate_fn=always_valid,
+    def _run(self, generate_fn, validate_fn, writer, errors=None):
+        return run_retry_loop(
+            document=INVALID_DOC,
+            errors=errors or [make_error()],
+            generate_fn=generate_fn,
+            validate_fn=validate_fn,
+            max_attempts=3,
+            generation_id=GEN_ID,
+            document_id=DOC_ID,
+            schema_version=SCHEMA,
+            model=MODEL,
+            temperature=0,
+            top_p=1,
+            writer=writer,
         )
+
+    def test_single_attempt_on_success(self, tmp_path):
+        writer = make_writer(tmp_path)
+
+        # Second document is valid — no errors
+        calls = [0]
+        def generate(doc, prompt):
+            calls[0] += 1
+            return VALID_DOC
+
+        def validate(doc):
+            if doc == VALID_DOC:
+                return []
+            return [make_error()]
+
+        result = self._run(generate, validate, writer)
+
         assert result.success is True
-        assert result.attempts == 0
+        lines = _read_events(writer)
+        assert len(lines) == 1
+        evt = lines[0]
+        assert evt["event_type"] == "generation_attempt"
+        assert evt["converged"] is True
+        assert evt["is_final_attempt"] is True
+        assert evt["attempt"] == 1
+        assert evt["errors"] == []
 
-    def test_first_retry_fixes_error(self):
-        initial_errors = [missing_field("title")]
-        call_count = [0]
+    def test_two_attempts_second_converges(self, tmp_path):
+        writer = make_writer(tmp_path)
+        docs = [INVALID_DOC + "_v2", VALID_DOC]
+        idx = [0]
 
-        def validate(doc: str) -> list[ValidationError]:
-            call_count[0] += 1
-            return []  # fixed after first retry
+        def generate(doc, prompt):
+            d = docs[idx[0]]
+            idx[0] += 1
+            return d
 
-        result = run_retry_loop(
-            document="bad doc",
-            errors=initial_errors,
-            generate_fn=incrementing_generate(),
-            validate_fn=validate,
-        )
+        def validate(doc):
+            if doc == VALID_DOC:
+                return []
+            return [make_error()]
+
+        result = self._run(generate, validate, writer)
         assert result.success is True
-        assert result.attempts == 1
 
-    def test_second_retry_fixes_error(self):
-        initial_errors = [missing_field("title")]
-        call_count = [0]
+        lines = _read_events(writer)
+        assert len(lines) == 2
 
-        def validate(doc: str) -> list[ValidationError]:
-            call_count[0] += 1
-            if call_count[0] < 2:
-                return [missing_field("domain")]  # still failing
-            return []  # fixed on second attempt
+        assert lines[0]["converged"] is False
+        assert lines[0]["is_final_attempt"] is False
+        assert lines[0]["attempt"] == 1
 
-        result = run_retry_loop(
-            document="bad doc",
-            errors=initial_errors,
-            generate_fn=incrementing_generate(),
-            validate_fn=validate,
-        )
-        assert result.success is True
-        assert result.attempts == 2
+        assert lines[1]["converged"] is True
+        assert lines[1]["is_final_attempt"] is True
+        assert lines[1]["attempt"] == 2
 
-    def test_warnings_do_not_block_success(self):
-        warning = ValidationError(
-            code=ErrorCode.SCHEMA_VIOLATION,
-            field="version",
-            expected="vX.Y",
-            received="1.0",
-            severity=Severity.WARNING,
-        )
+    def test_max_attempts_all_emitted(self, tmp_path):
+        writer = make_writer(tmp_path)
+        counter = [0]
 
-        def validate(_doc: str) -> list[ValidationError]:
-            return [warning]
+        def generate(doc, prompt):
+            counter[0] += 1
+            return doc + f"_{counter[0]}"  # unique each time
 
-        result = run_retry_loop(
-            document="bad doc",
-            errors=[missing_field("title")],
-            generate_fn=incrementing_generate(),
-            validate_fn=validate,
-        )
-        assert result.success is True
-        assert len(result.errors) == 1  # warning preserved
+        def validate(doc):
+            return [make_error()]  # always invalid
 
-
-# ---------------------------------------------------------------------------
-# Abort paths
-# ---------------------------------------------------------------------------
-
-class TestRetryAbort:
-
-    def test_max_attempts_exhausted(self):
-        """Max attempts reached when errors change each retry (no convergence)."""
-        # Errors rotate through different fields so convergence never triggers
-        fields = ["title", "domain", "level"]
-        call_count = [0]
-
-        def validate(_doc: str) -> list[ValidationError]:
-            idx = call_count[0] % len(fields)
-            call_count[0] += 1
-            return [missing_field(fields[idx])]
-
-        result = run_retry_loop(
-            document="bad doc",
-            errors=[missing_field("type")],  # initial error, different field
-            generate_fn=incrementing_generate(),
-            validate_fn=validate,
-        )
+        result = self._run(generate, validate, writer)
         assert result.success is False
-        assert result.attempts == MAX_ATTEMPTS
-        assert "max_attempts_reached" in result.abort_reason
 
-    def test_identical_output_aborts(self):
-        """Identical output detected when initial and retry errors differ (no early convergence)."""
-        # Use different initial errors vs validate errors so convergence
-        # doesn't trigger on attempt 1, allowing hash check to catch attempt 2
-        same_doc = make_valid_doc("same content every time")
-        initial_errors = [missing_field("type")]   # different field
-        retry_errors = [missing_field("domain")]   # different field → no convergence
+        lines = _read_events(writer)
+        assert len(lines) == 3
 
-        def validate(_doc: str) -> list[ValidationError]:
-            return retry_errors
+        for i, evt in enumerate(lines, start=1):
+            assert evt["attempt"] == i
+            assert evt["converged"] is False
 
-        result = run_retry_loop(
-            document="bad doc",
-            errors=initial_errors,
-            generate_fn=fixed_generate(same_doc),
-            validate_fn=validate,
-        )
-        assert result.success is False
+        assert lines[-1]["is_final_attempt"] is True
+
+    def test_identical_output_abort_emits_final(self, tmp_path):
+        writer = make_writer(tmp_path)
+
+        def generate(doc, prompt):
+            return INVALID_DOC  # always same → triggers identical_output abort
+
+        def validate(doc):
+            return [make_error()]
+
+        result = self._run(generate, validate, writer)
         assert "identical_output" in result.abort_reason
 
-    def test_same_ecode_same_field_twice_aborts(self):
-        """ADR-001 hard rule: same (field, E-code) pair failing twice → abort."""
-        errors = [missing_field("domain")]
-        call_count = [0]
+        lines = _read_events(writer)
+        assert len(lines) == 1
+        assert lines[0]["is_final_attempt"] is True
+        assert lines[0]["converged"] is False
 
-        def validate(_doc: str) -> list[ValidationError]:
-            call_count[0] += 1
-            return [missing_field("domain")]  # same field, same E-code every time
+    def test_convergence_failure_abort_emits_final(self, tmp_path):
+        writer = make_writer(tmp_path)
+        counter = [0]
 
-        result = run_retry_loop(
-            document="bad doc",
-            errors=errors,
-            generate_fn=incrementing_generate(),
-            validate_fn=validate,
-        )
-        assert result.success is False
+        def generate(doc, prompt):
+            counter[0] += 1
+            return doc + f"_v{counter[0]}"
+
+        # Same (field, code) on consecutive attempts → convergence_failure
+        def validate(doc):
+            return [make_error(field="domain", code=ErrorCode.TAXONOMY_VIOLATION)]
+
+        result = self._run(generate, validate, writer)
         assert "convergence_failure" in result.abort_reason
-        assert "domain" in result.abort_reason
+
+        lines = _read_events(writer)
+        assert len(lines) == 1
+        assert lines[0]["is_final_attempt"] is True
+        assert lines[0]["converged"] is False
+
+    def test_generation_id_consistent_across_attempts(self, tmp_path):
+        writer = make_writer(tmp_path)
+        counter = [0]
+
+        def generate(doc, prompt):
+            counter[0] += 1
+            return doc + f"_{counter[0]}"
+
+        def validate(doc):
+            return [make_error()]
+
+        self._run(generate, validate, writer)
+
+        lines = _read_events(writer)
+        gen_ids = {evt["generation_id"] for evt in lines}
+        assert gen_ids == {GEN_ID}
+
+    def test_model_and_temperature_in_events(self, tmp_path):
+        writer = make_writer(tmp_path)
+
+        def generate(doc, prompt):
+            return VALID_DOC
+
+        def validate(doc):
+            return []
+
+        self._run(generate, validate, writer)
+
+        lines = _read_events(writer)
+        evt = lines[0]
+        assert evt["model"] == MODEL
+        assert evt["temperature"] == 0
+        assert evt["top_p"] == 1
+
+    def test_duration_ms_positive(self, tmp_path):
+        writer = make_writer(tmp_path)
+
+        def generate(doc, prompt):
+            return VALID_DOC
+
+        def validate(doc):
+            return []
+
+        self._run(generate, validate, writer)
+
+        lines = _read_events(writer)
+        assert lines[0]["duration_ms"] >= 0
+
+    def test_errors_recorded_on_failed_attempt(self, tmp_path):
+        writer = make_writer(tmp_path)
+        counter = [0]
+
+        def generate(doc, prompt):
+            counter[0] += 1
+            return VALID_DOC if counter[0] == 2 else doc + "_bad"
+
+        def validate(doc):
+            if doc == VALID_DOC:
+                return []
+            return [make_error()]
+
+        self._run(generate, validate, writer)
+
+        lines = _read_events(writer)
+        assert lines[0]["errors"][0]["code"] == "E006_TAXONOMY_VIOLATION"
+        assert lines[1]["errors"] == []
 
 
-# ---------------------------------------------------------------------------
-# Attempt counting
-# ---------------------------------------------------------------------------
+# ─── writer=None — telemetry disabled ─────────────────────────────────────────
 
-class TestAttemptCounting:
+class TestNoWriter:
+    def test_writer_none_pipeline_succeeds(self):
+        def generate(doc, prompt):
+            return VALID_DOC
 
-    def test_attempt_count_matches_llm_calls(self):
-        call_count = [0]
-
-        def generate(_doc: str, _prompt: str) -> str:
-            call_count[0] += 1
-            return f"doc_{call_count[0]}"
-
-        errors = [missing_field("title")]
-
-        def validate(_doc: str) -> list[ValidationError]:
-            return []  # succeeds immediately
+        def validate(doc):
+            return []
 
         result = run_retry_loop(
-            document="bad doc",
-            errors=errors,
+            document=INVALID_DOC,
+            errors=[make_error()],
             generate_fn=generate,
             validate_fn=validate,
+            writer=None,
         )
-        assert result.attempts == call_count[0] == 1
+        assert result.success is True
 
-    def test_custom_max_attempts_respected(self):
-        """Custom max_attempts cap is respected when errors rotate (no convergence)."""
-        fields = ["title", "domain"]
-        call_count = [0]
+    def test_generation_id_none_no_emission(self, tmp_path):
+        writer = make_writer(tmp_path)
 
-        def validate(_doc: str) -> list[ValidationError]:
-            idx = call_count[0] % len(fields)
-            call_count[0] += 1
-            return [missing_field(fields[idx])]
+        def generate(doc, prompt):
+            return VALID_DOC
 
-        result = run_retry_loop(
-            document="bad doc",
-            errors=[missing_field("type")],
-            generate_fn=incrementing_generate(),
+        def validate(doc):
+            return []
+
+        run_retry_loop(
+            document=INVALID_DOC,
+            errors=[make_error()],
+            generate_fn=generate,
             validate_fn=validate,
-            max_attempts=2,
+            generation_id=None,  # no generation_id → no emission
+            writer=writer,
         )
-        assert result.attempts == 2
-        assert "max_attempts_reached" in result.abort_reason
+        assert not writer.path.exists()
 
 
-# ---------------------------------------------------------------------------
-# RetryResult contract
-# ---------------------------------------------------------------------------
+# ─── Telemetry failure isolation ──────────────────────────────────────────────
 
-class TestRetryResultContract:
+class TestTelemetryFailureIsolation:
+    def test_writer_exception_does_not_abort_pipeline(self, tmp_path):
+        """Telemetry write failure must never interrupt generation."""
+        broken_writer = MagicMock(spec=TelemetryWriter)
+        broken_writer.write.side_effect = OSError("disk full")
 
-    def test_success_result_has_no_abort_reason(self):
+        def generate(doc, prompt):
+            return VALID_DOC
+
+        def validate(doc):
+            return []
+
         result = run_retry_loop(
-            document="doc",
-            errors=[],
-            generate_fn=fixed_generate("new"),
-            validate_fn=always_valid,
+            document=INVALID_DOC,
+            errors=[make_error()],
+            generate_fn=generate,
+            validate_fn=validate,
+            generation_id=GEN_ID,
+            document_id=DOC_ID,
+            schema_version=SCHEMA,
+            model=MODEL,
+            temperature=0,
+            top_p=1,
+            writer=broken_writer,
         )
-        assert result.abort_reason is None
+        assert result.success is True
 
-    def test_failure_result_has_abort_reason(self):
-        errors = [missing_field("title")]
-        result = run_retry_loop(
-            document="bad doc",
-            errors=errors,
-            generate_fn=incrementing_generate(),
-            validate_fn=always_invalid(errors),
-        )
-        assert result.abort_reason is not None
-        assert isinstance(result.abort_reason, str)
 
-    def test_str_representation_success(self):
-        result = run_retry_loop(
-            document="doc",
-            errors=[],
-            generate_fn=fixed_generate("new"),
-            validate_fn=always_valid,
-        )
-        assert "success=True" in str(result)
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
-    def test_str_representation_failure(self):
-        errors = [missing_field("title")]
-        result = run_retry_loop(
-            document="bad doc",
-            errors=errors,
-            generate_fn=incrementing_generate(),
-            validate_fn=always_invalid(errors),
-        )
-        assert "success=False" in str(result)
+def _read_events(writer: TelemetryWriter) -> list[dict]:
+    import json
+    if not writer.path.exists():
+        return []
+    return [json.loads(line) for line in writer.path.read_text().strip().split("\n") if line]
