@@ -38,8 +38,7 @@ jobs:
     
     - name: Run tests with coverage
       run: |
-        pytest --cov=Scripts --cov=exceptions --cov=logger --cov-report=term-missing --cov-report=xml --cov-fail-under=75 -v
-    
+        pytest --cov=Scripts --cov=akf --cov=exceptions --cov=logger --cov-report=term-missing --cov-report=xml --cov-fail-under=75 -v
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
