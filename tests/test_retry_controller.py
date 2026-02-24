@@ -53,6 +53,17 @@ def make_error(field="domain", code=ErrorCode.TAXONOMY_VIOLATION, received="back
     )
 
 
+def make_title_error():
+    """Error on a different field — avoids convergence_failure on attempt 1."""
+    return ValidationError(
+        code=ErrorCode.MISSING_FIELD,
+        field="title",
+        expected="present",
+        received="absent",
+        severity=Severity.ERROR,
+    )
+
+
 def make_writer(tmp_path):
     return TelemetryWriter(path=tmp_path / "events.jsonl")
 
@@ -141,7 +152,9 @@ class TestAttemptEventEmission:
                 return []
             return [make_error()]
 
-        result = self._run(generate, validate, writer)
+        # Initial errors use a different field so convergence_failure won't
+        # trigger on attempt 1 when validate returns domain error
+        result = self._run(generate, validate, writer, errors=[make_title_error()])
         assert result.success is True
 
         lines = _read_events(writer)
@@ -163,10 +176,16 @@ class TestAttemptEventEmission:
             counter[0] += 1
             return doc + f"_{counter[0]}"  # unique each time
 
-        def validate(doc):
-            return [make_error()]  # always invalid
+        # Rotate error fields each call so convergence_failure never fires
+        fields = ["title", "domain", "level"]
+        validate_counter = [0]
 
-        result = self._run(generate, validate, writer)
+        def validate(doc):
+            f = fields[validate_counter[0] % len(fields)]
+            validate_counter[0] += 1
+            return [make_error(field=f, code=ErrorCode.MISSING_FIELD if f == "title" else ErrorCode.TAXONOMY_VIOLATION)]
+
+        result = self._run(generate, validate, writer, errors=[make_title_error()])
         assert result.success is False
 
         lines = _read_events(writer)
@@ -187,7 +206,9 @@ class TestAttemptEventEmission:
         def validate(doc):
             return [make_error()]
 
-        result = self._run(generate, validate, writer)
+        # Initial error on different field so convergence_failure doesn't
+        # fire before identical_output check
+        result = self._run(generate, validate, writer, errors=[make_title_error()])
         assert "identical_output" in result.abort_reason
 
         lines = _read_events(writer)
@@ -276,7 +297,9 @@ class TestAttemptEventEmission:
                 return []
             return [make_error()]
 
-        self._run(generate, validate, writer)
+        # Initial error on different field so convergence_failure doesn't
+        # fire on attempt 1 when validate returns domain error
+        self._run(generate, validate, writer, errors=[make_title_error()])
 
         lines = _read_events(writer)
         assert lines[0]["errors"][0]["code"] == "E006_TAXONOMY_VIOLATION"
