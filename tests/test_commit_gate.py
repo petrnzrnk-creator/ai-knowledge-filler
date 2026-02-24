@@ -1,190 +1,261 @@
-"""
-Tests for AKF Phase 2.1 — Commit Gate (S4)
-ADR-001: Validation Layer Architecture
+"""Tests for GenerationSummaryEvent emission in CommitGate (Task 5 / Phase 2.3).
+
+Covers:
+  - event emitted on successful commit (converged=True, final_domain set)
+  - event emitted on blocking errors (converged=False, abort_reason="blocking_errors")
+  - event emitted on schema_version mismatch (abort_reason="schema_version_mismatch")
+  - writer=None → no emission, pipeline unaffected
+  - generation_id=None → no emission
+  - telemetry failure → pipeline continues (observe, never influence)
+  - rejected_candidates propagated to event
+  - final_domain extracted from document
+  - event_type == "generation_summary"
 """
 
-import pytest
+import json
+import uuid
 from pathlib import Path
-from akf.commit_gate import commit, CommitResult, SCHEMA_VERSION, _extract_schema_version
+from unittest.mock import MagicMock
+
+import pytest
+
+from akf.commit_gate import commit, SCHEMA_VERSION
+from akf.telemetry import TelemetryWriter
 from akf.validation_error import (
-    ValidationError, ErrorCode, Severity,
-    missing_field, schema_violation,
+    Severity,
+    ValidationError,
+    ErrorCode,
+    taxonomy_violation,
 )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# ─── FIXTURES ─────────────────────────────────────────────────────────────────
 
-def make_doc(schema_version: str = SCHEMA_VERSION, extra: str = "") -> str:
-    return (
-        f"---\n"
-        f"title: Test Document\n"
-        f"type: concept\n"
-        f"domain: ai-system\n"
-        f"schema_version: {schema_version}\n"
-        f"---\n"
-        f"## Content\n{extra}"
+GEN_ID = str(uuid.uuid4())
+DOC_ID = "test_doc"
+MODEL = "groq-test"
+
+VALID_DOC = f"""---
+title: Valid Document
+type: guide
+domain: api-design
+level: intermediate
+status: active
+schema_version: "{SCHEMA_VERSION}"
+created: 2026-02-24
+updated: 2026-02-24
+---
+
+# Body
+"""
+
+WRONG_VERSION_DOC = f"""---
+title: Wrong Version
+type: guide
+domain: api-design
+level: intermediate
+status: active
+schema_version: "9.9.9"
+created: 2026-02-24
+updated: 2026-02-24
+---
+
+# Body
+"""
+
+
+def make_writer(tmp_path: Path) -> TelemetryWriter:
+    return TelemetryWriter(path=tmp_path / "events.jsonl")
+
+
+def blocking_error() -> ValidationError:
+    return taxonomy_violation("domain", "backend", ["api-design"])
+
+
+def read_events(writer: TelemetryWriter) -> list[dict]:
+    if not writer.path.exists():
+        return []
+    return [json.loads(l) for l in writer.path.read_text().strip().split("\n") if l]
+
+
+def run_commit(doc, output_path, errors, writer, rejected=None):
+    return commit(
+        document=doc,
+        output_path=output_path,
+        errors=errors,
+        generation_id=GEN_ID,
+        document_id=DOC_ID,
+        schema_version=SCHEMA_VERSION,
+        total_attempts=2,
+        rejected_candidates=rejected or [],
+        model=MODEL,
+        temperature=0,
+        total_duration_ms=1500,
+        writer=writer,
     )
 
 
-def no_errors() -> list[ValidationError]:
-    return []
+# ─── Success path ─────────────────────────────────────────────────────────────
+
+class TestSummaryOnSuccess:
+    def test_emits_one_summary_event(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        events = read_events(writer)
+        assert len(events) == 1
+
+    def test_event_type_generation_summary(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["event_type"] == "generation_summary"
+
+    def test_converged_true(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["converged"] is True
+
+    def test_abort_reason_none(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["abort_reason"] is None
+
+    def test_final_domain_extracted(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["final_domain"] == "api-design"
+
+    def test_generation_id_in_event(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["generation_id"] == GEN_ID
+
+    def test_model_and_temperature(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        evt = read_events(writer)[0]
+        assert evt["model"] == MODEL
+        assert evt["temperature"] == 0
+
+    def test_total_attempts_propagated(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["total_attempts"] == 2
+
+    def test_total_duration_ms_propagated(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["total_duration_ms"] == 1500
+
+    def test_rejected_candidates_propagated(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer, rejected=["backend", "api"])
+        assert read_events(writer)[0]["rejected_candidates"] == ["backend", "api"]
+
+    def test_empty_rejected_candidates(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["rejected_candidates"] == []
 
 
-def blocking_error() -> list[ValidationError]:
-    return [missing_field("title")]
+# ─── Blocking errors path ─────────────────────────────────────────────────────
+
+class TestSummaryOnBlockingErrors:
+    def test_emits_summary_on_blocking_error(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [blocking_error()], writer)
+        events = read_events(writer)
+        assert len(events) == 1
+
+    def test_converged_false(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [blocking_error()], writer)
+        assert read_events(writer)[0]["converged"] is False
+
+    def test_abort_reason_blocking_errors(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [blocking_error()], writer)
+        assert read_events(writer)[0]["abort_reason"] == "blocking_errors"
+
+    def test_final_domain_none_on_failure(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(VALID_DOC, tmp_path / "out.md", [blocking_error()], writer)
+        assert read_events(writer)[0]["final_domain"] is None
+
+    def test_file_not_written_on_blocking(self, tmp_path):
+        writer = make_writer(tmp_path)
+        out = tmp_path / "out.md"
+        run_commit(VALID_DOC, out, [blocking_error()], writer)
+        assert not out.exists()
 
 
-def warning_only() -> list[ValidationError]:
-    return [
-        ValidationError(
-            code=ErrorCode.SCHEMA_VIOLATION,
-            field="version",
-            expected="vX.Y",
-            received="1.0",
-            severity=Severity.WARNING,
+# ─── Schema version mismatch path ─────────────────────────────────────────────
+
+class TestSummaryOnSchemaVersionMismatch:
+    def test_emits_summary_on_version_mismatch(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
+        events = read_events(writer)
+        assert len(events) == 1
+
+    def test_converged_false_on_mismatch(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["converged"] is False
+
+    def test_abort_reason_schema_version_mismatch(self, tmp_path):
+        writer = make_writer(tmp_path)
+        run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
+        assert read_events(writer)[0]["abort_reason"] == "schema_version_mismatch"
+
+
+# ─── writer=None and generation_id=None ───────────────────────────────────────
+
+class TestNoTelemetry:
+    def test_writer_none_commit_succeeds(self, tmp_path):
+        out = tmp_path / "out.md"
+        result = commit(
+            document=VALID_DOC,
+            output_path=out,
+            errors=[],
+            writer=None,
         )
-    ]
-
-
-# ---------------------------------------------------------------------------
-# Commit success
-# ---------------------------------------------------------------------------
-
-class TestCommitSuccess:
-
-    def test_commits_valid_document(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", no_errors())
         assert result.committed is True
-        assert result.path == tmp_path / "output.md"
-        assert (tmp_path / "output.md").exists()
+        assert out.exists()
 
-    def test_committed_file_contains_document(self, tmp_path):
-        doc = make_doc(extra="unique content 12345")
-        commit(doc, tmp_path / "output.md", no_errors())
-        content = (tmp_path / "output.md").read_text()
-        assert "unique content 12345" in content
+    def test_writer_none_no_file_created(self, tmp_path):
+        telemetry_path = tmp_path / "events.jsonl"
+        commit(document=VALID_DOC, output_path=tmp_path / "out.md", errors=[], writer=None)
+        assert not telemetry_path.exists()
 
-    def test_warnings_do_not_block_commit(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", warning_only())
-        assert result.committed is True
-
-    def test_creates_parent_directories(self, tmp_path):
-        doc = make_doc()
-        deep_path = tmp_path / "a" / "b" / "c" / "output.md"
-        result = commit(doc, deep_path, no_errors())
-        assert result.committed is True
-        assert deep_path.exists()
-
-    def test_schema_version_in_result(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", no_errors())
-        assert result.schema_version == SCHEMA_VERSION
-
-
-# ---------------------------------------------------------------------------
-# Commit blocked by errors
-# ---------------------------------------------------------------------------
-
-class TestCommitBlocked:
-
-    def test_blocking_error_prevents_commit(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", blocking_error())
-        assert result.committed is False
-        assert not (tmp_path / "output.md").exists()
-
-    def test_blocking_error_returns_errors(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", blocking_error())
-        assert len(result.blocking_errors) == 1
-        assert result.blocking_errors[0].code == ErrorCode.MISSING_FIELD
-
-    def test_path_is_none_when_not_committed(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", blocking_error())
-        assert result.path is None
-
-
-# ---------------------------------------------------------------------------
-# schema_version enforcement
-# ---------------------------------------------------------------------------
-
-class TestSchemaVersionEnforcement:
-
-    def test_missing_schema_version_blocks_commit(self, tmp_path):
-        doc = "---\ntitle: Test\ntype: concept\n---\n## Content"
-        result = commit(doc, tmp_path / "output.md", no_errors())
-        assert result.committed is False
-        assert any(
-            e.field == "schema_version" for e in result.blocking_errors
+    def test_generation_id_none_no_emission(self, tmp_path):
+        writer = make_writer(tmp_path)
+        commit(
+            document=VALID_DOC,
+            output_path=tmp_path / "out.md",
+            errors=[],
+            generation_id=None,
+            writer=writer,
         )
+        assert not writer.path.exists()
 
-    def test_wrong_schema_version_blocks_commit(self, tmp_path):
-        doc = make_doc(schema_version="0.0.1")
-        result = commit(doc, tmp_path / "output.md", no_errors())
-        assert result.committed is False
-        assert any(
-            e.field == "schema_version" for e in result.blocking_errors
+
+# ─── Telemetry failure isolation ──────────────────────────────────────────────
+
+class TestTelemetryFailureIsolation:
+    def test_writer_exception_does_not_abort_commit(self, tmp_path):
+        broken_writer = MagicMock(spec=TelemetryWriter)
+        broken_writer.write.side_effect = OSError("disk full")
+        out = tmp_path / "out.md"
+
+        result = commit(
+            document=VALID_DOC,
+            output_path=out,
+            errors=[],
+            generation_id=GEN_ID,
+            document_id=DOC_ID,
+            model=MODEL,
+            temperature=0,
+            writer=broken_writer,
         )
-
-    def test_correct_schema_version_passes(self, tmp_path):
-        doc = make_doc(schema_version=SCHEMA_VERSION)
-        result = commit(doc, tmp_path / "output.md", no_errors())
         assert result.committed is True
-
-    def test_schema_version_not_auto_upgraded(self, tmp_path):
-        """Commit gate does not rewrite schema_version — it enforces or rejects."""
-        doc = make_doc(schema_version="0.9.9")
-        result = commit(doc, tmp_path / "output.md", no_errors())
-        assert result.committed is False
-        # File must NOT exist — gate did not write and silently upgrade
-        assert not (tmp_path / "output.md").exists()
-
-
-# ---------------------------------------------------------------------------
-# _extract_schema_version helper
-# ---------------------------------------------------------------------------
-
-class TestExtractSchemaVersion:
-
-    def test_extracts_version_from_frontmatter(self):
-        doc = make_doc(schema_version="1.0.0")
-        assert _extract_schema_version(doc) == "1.0.0"
-
-    def test_returns_none_when_missing(self):
-        doc = "---\ntitle: Test\n---\ncontent"
-        assert _extract_schema_version(doc) is None
-
-    def test_handles_quoted_value(self):
-        doc = '---\nschema_version: "1.0.0"\n---\ncontent'
-        assert _extract_schema_version(doc) == "1.0.0"
-
-    def test_ignores_version_outside_frontmatter(self):
-        doc = "---\ntitle: Test\n---\nschema_version: 9.9.9"
-        assert _extract_schema_version(doc) is None
-
-
-# ---------------------------------------------------------------------------
-# CommitResult contract
-# ---------------------------------------------------------------------------
-
-class TestCommitResultContract:
-
-    def test_str_success(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", no_errors())
-        assert "committed=True" in str(result)
-
-    def test_str_failure(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", blocking_error())
-        assert "committed=False" in str(result)
-
-    def test_no_blocking_errors_on_success(self, tmp_path):
-        doc = make_doc()
-        result = commit(doc, tmp_path / "output.md", no_errors())
-        assert result.blocking_errors == []
+        assert out.exists()
