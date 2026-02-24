@@ -176,15 +176,17 @@ class TestAttemptEventEmission:
             counter[0] += 1
             return doc + f"_{counter[0]}"  # unique each time
 
-        # Rotate error fields each call so convergence_failure never fires
-        fields = ["title", "domain", "level"]
+        # Each attempt returns a different (field, code) pair so
+        # convergence_failure never fires and all 3 attempts are emitted
+        fields = ["domain", "level", "status"]
         validate_counter = [0]
 
         def validate(doc):
             f = fields[validate_counter[0] % len(fields)]
             validate_counter[0] += 1
-            return [make_error(field=f, code=ErrorCode.MISSING_FIELD if f == "title" else ErrorCode.TAXONOMY_VIOLATION)]
+            return [make_error(field=f)]
 
+        # Initial error on title — differs from all validate_fn fields
         result = self._run(generate, validate, writer, errors=[make_title_error()])
         assert result.success is False
 
@@ -208,13 +210,16 @@ class TestAttemptEventEmission:
 
         # Initial error on different field so convergence_failure doesn't
         # fire before identical_output check
+        # identical_output abort fires on attempt 2 (seen_hashes has attempt 1),
+        # so 2 events are emitted: attempt 1 (not final) + attempt 2 (final)
         result = self._run(generate, validate, writer, errors=[make_title_error()])
         assert "identical_output" in result.abort_reason
 
         lines = _read_events(writer)
-        assert len(lines) == 1
-        assert lines[0]["is_final_attempt"] is True
-        assert lines[0]["converged"] is False
+        assert len(lines) == 2
+        assert lines[0]["is_final_attempt"] is False
+        assert lines[1]["is_final_attempt"] is True
+        assert lines[1]["converged"] is False
 
     def test_convergence_failure_abort_emits_final(self, tmp_path):
         writer = make_writer(tmp_path)
