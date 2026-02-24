@@ -10,15 +10,33 @@ Enforces:
   - Domain taxonomy (E006)
   - Date format ISO 8601 (E003)
   - Tags array min 3 items (E004)
+
+Changelog:
+  - Fix: imports moved to module level (PEP 8, audit finding #1)
+  - Fix: datetime.date handling in _check_dates (audit finding #2)
+
+Canon-deferred (pending Canon revision, not to be implemented without ADR update):
+  - CANON-DEFER-001: hard-coded enums → external config
+    Reason: Canon §3.1 requires determinism. Config = new source of non-determinism.
+    Revisit: Phase 2.4 Schema Evolution Tooling
+  - CANON-DEFER-002: semantic constraint created ≤ updated
+    Reason: requires new E-code and cross-field validation contract.
+    Revisit: Phase 2.4
+  - CANON-DEFER-003: isinstance check for title (str enforcement)
+    Reason: minor, no E-code defined yet.
+    Revisit: Phase 2.4
 """
 
 import re
+from datetime import date as DateType
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from akf.validation_error import (
+    ErrorCode,
+    Severity,
     ValidationError,
     invalid_date_format,
     invalid_enum,
@@ -29,6 +47,8 @@ from akf.validation_error import (
 
 # ---------------------------------------------------------------------------
 # Enum constraints (hard-coded, immutable)
+# CANON-DEFER-001: intentionally hard-coded per Canon §3.1 (determinism).
+# Do not move to config without Canon revision + ADR update.
 # ---------------------------------------------------------------------------
 
 VALID_TYPES = [
@@ -82,6 +102,7 @@ def _default_taxonomy() -> list[str]:
         "sales", "security", "system-design", "workflow-automation",
     ])
 
+
 # ---------------------------------------------------------------------------
 # Validation Engine
 # ---------------------------------------------------------------------------
@@ -108,13 +129,13 @@ def validate(document: str, taxonomy_path: Path | None = None) -> list[Validatio
 
     return errors
 
+
 # ---------------------------------------------------------------------------
 # Frontmatter parser
 # ---------------------------------------------------------------------------
 
 def _parse_frontmatter(document: str) -> tuple[dict, ValidationError | None]:
-    from akf.validation_error import ErrorCode, Severity
-
+    """Parse YAML frontmatter block from Markdown document."""
     lines = document.splitlines()
     if not lines or lines[0].strip() != "---":
         return {}, ValidationError(
@@ -151,6 +172,7 @@ def _parse_frontmatter(document: str) -> tuple[dict, ValidationError | None]:
 
     return metadata, None
 
+
 # ---------------------------------------------------------------------------
 # Field checkers
 # ---------------------------------------------------------------------------
@@ -181,19 +203,30 @@ def _check_taxonomy(metadata: dict, valid_domains: list[str]) -> list[Validation
 
 
 def _check_dates(metadata: dict) -> list[ValidationError]:
+    """
+    Validate ISO 8601 date fields.
+
+    Fix (audit finding #2): PyYAML parses unquoted YYYY-MM-DD values as
+    datetime.date objects, not strings. We handle both cases explicitly
+    rather than relying on str() conversion as accidental correctness.
+    """
     errors = []
     for field_name in ("created", "updated"):
         value = metadata.get(field_name)
         if value is None:
             continue
+        # PyYAML auto-converts unquoted YYYY-MM-DD → datetime.date
+        # That is a valid date by definition — accept it explicitly.
+        if isinstance(value, DateType):
+            continue
+        # All other types must match the string pattern
         if not DATE_PATTERN.match(str(value)):
             errors.append(invalid_date_format(field_name, str(value)))
     return errors
 
 
 def _check_tags(metadata: dict) -> list[ValidationError]:
-    from akf.validation_error import ErrorCode
-
+    """Validate tags field: must be a list with >= TAGS_MIN items."""
     tags = metadata.get("tags")
     if tags is None:
         return []
