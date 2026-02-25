@@ -13,14 +13,47 @@
 
 ---
 
-## Problem → Solution
+## What is AKF
 
-**Problem:** LLMs generate inconsistent, unstructured responses that require manual formatting.
+**AKF (AI Knowledge Filler)** is an AI-Native Cognitive Operating System —
+a deterministic validation pipeline that turns LLM output into schema-compliant, ontology-governed knowledge files.
 
-**Solution:** System prompt that transforms any LLM into a deterministic file generator — same input, same structure, every time.
+> LLMs generate text. Text is not knowledge.
 
-**Result:** Production-ready Markdown files with validated YAML metadata. Zero manual post-processing.
+**What it is not:** a note-taking app, a chat assistant, a markdown generator, an Obsidian plugin.
+**What it is:** the operating contract for a knowledge base that scales.
 
+### The Problem
+
+Without a validation layer, AI-generated content produces:
+
+| Error | Example |
+|-------|---------|
+| Domain violation | `domain: Technology` → valid: `domain: system-design` |
+| Enum violation | `level: expert` → valid: `beginner \| intermediate \| advanced` |
+| Type mismatch | `tags: security` → valid: `tags: [security, api, auth]` |
+| Date format | `created: 12-02-2026` → valid: `created: 2026-02-12` |
+
+Each error is trivial. Across hundreds of files, they make a vault unsearchable,
+Dataview queries return nothing, and the knowledge graph becomes noise.
+
+AKF solves this at the **generation layer**, not the review layer.
+
+### What Every Committed File Guarantees
+
+- Required fields: `title`, `type`, `domain`, `level`, `status`, `tags`, `created`, `updated`
+- Valid enums: `type`, `level`, `status` from controlled sets
+- Domain from configured taxonomy (`akf.yaml`) — not hardcoded
+- ISO 8601 dates with `created ≤ updated`
+- `tags` as array (≥3), `title` as string — no type mismatches
+
+Violations produce error codes E001–E007. Retry instructions are derived from those codes, not from free-form prompts.
+
+### Retry = Ontology Signal
+
+Retry pressure is not a failure metric.
+When a domain triggers elevated retries, the taxonomy has a boundary problem — not the model.
+Telemetry captures this signal. Ontology improves from data, not intuition.
 ---
 
 ## ⚡ Quick Start (60 seconds)
@@ -370,13 +403,19 @@ done < topics.txt
 - [x] CI/CD Pipelines (GitHub Actions)
 - [x] PyPI package (`pip install ai-knowledge-filler`)
 
-### v0.2.x ✅ (Current)
+### v0.2.x ✅ (Shipped)
 - [x] Validation pipeline (Phase 2.1 — ValidationError, Error Normalizer, Retry Controller, Commit Gate)
-- [ ] Obsidian vault auto-routing
-- [ ] Local model support (llama.cpp endpoint)
-- [ ] Enhanced documentation
-- [ ] VSCode extension (YAML validation)
+- [x] Hard enum enforcement — E001–E006, 97% coverage (Phase 2.2)
+- [x] Telemetry layer — append-only JSONL, generation_id, convergence metrics (Phase 2.3)
 
+### v0.3.0 🔄 (Current)
+- [x] Config layer — external `akf.yaml`, taxonomy configurable without code changes (Phase 2.4)
+- [x] `akf init` — generates `akf.yaml` for a new vault
+- [x] Validator Model D — `created ≤ updated` (E007), `title` isinstance str (E004)
+- [ ] PyPI publish pending tag
+
+### v1.0.0 (Planned — Phase 2.5)
+- [ ] Onboarding & public announcement
 ---
 
 ## License
@@ -399,7 +438,7 @@ LLMs are **deterministic infrastructure**, not conversational toys.
 **Created by:** Petr — AI Solutions Architect
 **PyPI:** https://pypi.org/project/ai-knowledge-filler/
 **Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
-**Version:** 0.2.0
+**Version:** 0.3.0
 
 ---
 
