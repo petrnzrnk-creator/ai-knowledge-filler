@@ -127,6 +127,44 @@ def cmd_validate(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+# ─── INIT ─────────────────────────────────────────────────────────────────────
+
+
+def cmd_init(args: argparse.Namespace) -> None:
+    """
+    Generate akf.yaml in the target directory.
+
+    Copies the bundled default config to the vault root (or --path).
+    If akf.yaml already exists, aborts unless --force is passed.
+    """
+    import shutil
+
+    target_dir = Path(args.path) if args.path else Path.cwd()
+    target = target_dir / "akf.yaml"
+
+    # Find bundled default
+    try:
+        import akf
+        default_config = Path(akf.__file__).parent / "defaults" / "akf.yaml"
+    except Exception:
+        default_config = Path(__file__).parent / "akf" / "defaults" / "akf.yaml"
+
+    if not default_config.exists():
+        err(f"Bundled default config not found: {default_config}")
+        sys.exit(1)
+
+    if target.exists() and not args.force:
+        warn(f"akf.yaml already exists: {target}")
+        warn("Use --force to overwrite.")
+        sys.exit(1)
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(default_config, target)
+    ok(f"Created: {target}")
+    info("Edit akf.yaml to customize your taxonomy and enums.")
+    info("Docs: https://github.com/petrnzrnk-creator/ai-knowledge-filler")
+
+
 # ─── GENERATE ─────────────────────────────────────────────────────────────────
 
 
@@ -294,7 +332,6 @@ def cmd_generate(args: argparse.Namespace) -> None:
         warn(f"Validation found {len(commit_result.blocking_errors)} issues.")
 
 
-
 # ─── MODELS ───────────────────────────────────────────────────────────────────
 
 
@@ -333,6 +370,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="akf")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    # Init command
+    init = sub.add_parser("init", help="Generate akf.yaml for a new vault")
+    init.add_argument("--path", "-p", help="Target directory (default: CWD)")
+    init.add_argument("--force", "-f", action="store_true",
+                      help="Overwrite existing akf.yaml")
+
     # Generate command
     gen = sub.add_parser("generate", help="Generate knowledge file")
     gen.add_argument("prompt")
@@ -353,7 +396,9 @@ def main() -> int:
     models = sub.add_parser("models", help="List available LLM providers")
 
     args = parser.parse_args()
-    if args.command == "generate":
+    if args.command == "init":
+        cmd_init(args)
+    elif args.command == "generate":
         cmd_generate(args)
     elif args.command == "validate":
         cmd_validate(args)
