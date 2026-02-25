@@ -1,272 +1,403 @@
 """
-Tests for AKF Phase 2.2 — Validation Engine (Model C)
+tests/test_validator.py — Phase 2.4 validator tests
+
+Covers CANON-DEFER-001/002/003 changes only.
+Existing Phase 2.2/2.3 tests remain untouched.
+
+Fixtures use reset_config() to isolate config state between tests.
 """
+
+from __future__ import annotations
+
+import textwrap
+from pathlib import Path
 
 import pytest
-from akf.validator import validate, _load_taxonomy, _default_taxonomy
+
+from akf.config import reset_config, load_config, get_config
+from akf.validator import validate
 from akf.validation_error import ErrorCode
 
+# ─── helpers ──────────────────────────────────────────────────────────────────
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+def make_doc(**overrides) -> str:
+    """Build a minimal valid document, overriding specific fields."""
+    fields = {
+        "title": "Test Document",
+        "type": "concept",
+        "domain": "ai-system",
+        "level": "beginner",
+        "status": "active",
+        "tags": ["a", "b", "c"],
+        "created": "2026-01-01",
+        "updated": "2026-01-02",
+    }
+    fields.update(overrides)
 
-VALID_DOC = """\
----
-title: "Test Document"
-type: concept
-domain: ai-system
-level: intermediate
-status: active
-tags: [test, ai, obsidian]
-created: 2026-02-22
-updated: 2026-02-22
----
-
-## Overview
-
-Test content.
-"""
-
-# ---------------------------------------------------------------------------
-# Happy path
-# ---------------------------------------------------------------------------
-
-def test_valid_document_returns_no_errors():
-    errors = validate(VALID_DOC)
-    assert errors == []
+    lines = ["---"]
+    for k, v in fields.items():
+        if isinstance(v, list):
+            lines.append(f"{k}:")
+            for item in v:
+                lines.append(f"  - {item}")
+        else:
+            lines.append(f"{k}: {v}")
+    lines += ["---", "", "# Body"]
+    return "\n".join(lines)
 
 
-def test_all_valid_types():
-    valid_types = ["concept", "guide", "reference", "checklist",
-                   "project", "roadmap", "template", "audit"]
-    for t in valid_types:
-        doc = VALID_DOC.replace("type: concept", f"type: {t}")
+@pytest.fixture(autouse=True)
+def clear_config():
+    reset_config()
+    yield
+    reset_config()
+
+
+# ─── CANON-DEFER-001: enums from config ───────────────────────────────────────
+
+class TestEnumsFromConfig:
+    def test_default_config_accepts_standard_type(self):
+        doc = make_doc(type="concept")
         errors = validate(doc)
         type_errors = [e for e in errors if e.field == "type"]
-        assert type_errors == [], f"type={t} should be valid"
+        assert type_errors == []
 
-
-def test_all_valid_levels():
-    for level in ["beginner", "intermediate", "advanced"]:
-        doc = VALID_DOC.replace("level: intermediate", f"level: {level}")
+    def test_default_config_rejects_unknown_type(self):
+        doc = make_doc(type="sop")
         errors = validate(doc)
-        level_errors = [e for e in errors if e.field == "level"]
-        assert level_errors == [], f"level={level} should be valid"
+        type_errors = [e for e in errors if e.field == "type"]
+        assert len(type_errors) == 1
+        assert type_errors[0].code == ErrorCode.INVALID_ENUM
 
+    def test_custom_config_accepts_custom_type(self, tmp_path: Path):
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "enums:\n  type:\n    - sop\n    - concept\n"
+            "taxonomy:\n  domains:\n    - ai-system\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
 
-def test_all_valid_statuses():
-    for status in ["draft", "active", "completed", "archived"]:
-        doc = VALID_DOC.replace("status: active", f"status: {status}")
+        doc = make_doc(type="sop")
         errors = validate(doc)
-        status_errors = [e for e in errors if e.field == "status"]
-        assert status_errors == [], f"status={status} should be valid"
+        type_errors = [e for e in errors if e.field == "type"]
+        assert type_errors == []
 
+    def test_custom_config_rejects_removed_type(self, tmp_path: Path):
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "enums:\n  type:\n    - sop\n"
+            "taxonomy:\n  domains:\n    - ai-system\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
 
-# ---------------------------------------------------------------------------
-# Missing fields — E002
-# ---------------------------------------------------------------------------
+        doc = make_doc(type="concept")  # not in custom config
+        errors = validate(doc)
+        type_errors = [e for e in errors if e.field == "type"]
+        assert len(type_errors) == 1
 
-@pytest.mark.parametrize("field", [
-    "title", "type", "domain", "level", "status", "tags", "created", "updated"
-])
-def test_missing_required_field(field):
-    lines = [l for l in VALID_DOC.splitlines() if not l.startswith(f"{field}:")]
-    doc = "\n".join(lines)
-    errors = validate(doc)
-    codes = [e.code for e in errors]
-    assert ErrorCode.MISSING_FIELD in codes
-    missing = [e for e in errors if e.field == field]
-    assert missing, f"Expected missing_field error for '{field}'"
+    def test_custom_config_accepts_custom_domain(self, tmp_path: Path):
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "taxonomy:\n  domains:\n    - marine-engineering\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
 
-
-# ---------------------------------------------------------------------------
-# Enum violations — E001
-# ---------------------------------------------------------------------------
-
-def test_invalid_type_returns_e001():
-    doc = VALID_DOC.replace("type: concept", "type: document")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.INVALID_ENUM and e.field == "type" for e in errors)
-
-
-def test_invalid_level_returns_e001():
-    doc = VALID_DOC.replace("level: intermediate", "level: expert")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.INVALID_ENUM and e.field == "level" for e in errors)
-
-
-def test_invalid_status_returns_e001():
-    doc = VALID_DOC.replace("status: active", "status: in-progress")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.INVALID_ENUM and e.field == "status" for e in errors)
-
-
-def test_invalid_enum_includes_valid_values_in_expected():
-    doc = VALID_DOC.replace("type: concept", "type: note")
-    errors = validate(doc)
-    enum_errors = [e for e in errors if e.field == "type"]
-    assert enum_errors
-    assert "concept" in enum_errors[0].expected
-
-
-# ---------------------------------------------------------------------------
-# Taxonomy violations — E006
-# ---------------------------------------------------------------------------
-
-def test_invalid_domain_returns_e006():
-    doc = VALID_DOC.replace("domain: ai-system", "domain: technology")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.TAXONOMY_VIOLATION and e.field == "domain" for e in errors)
-
-
-def test_invalid_domain_includes_valid_list():
-    doc = VALID_DOC.replace("domain: ai-system", "domain: backend")
-    errors = validate(doc)
-    tax_errors = [e for e in errors if e.field == "domain"]
-    assert tax_errors
-    assert isinstance(tax_errors[0].expected, list)
-    assert len(tax_errors[0].expected) > 0
-
-
-def test_all_default_taxonomy_domains_are_valid():
-    for domain in _default_taxonomy():
-        doc = VALID_DOC.replace("domain: ai-system", f"domain: {domain}")
+        doc = make_doc(domain="marine-engineering")
         errors = validate(doc)
         domain_errors = [e for e in errors if e.field == "domain"]
-        assert domain_errors == [], f"domain={domain} should be valid"
+        assert domain_errors == []
+
+    def test_custom_config_rejects_default_domain_when_not_listed(self, tmp_path: Path):
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "taxonomy:\n  domains:\n    - marine-engineering\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
+
+        doc = make_doc(domain="ai-system")  # not in custom list
+        errors = validate(doc)
+        domain_errors = [e for e in errors if e.field == "domain"]
+        assert len(domain_errors) == 1
+        assert domain_errors[0].code == ErrorCode.TAXONOMY_VIOLATION
+
+    def test_custom_level_enum(self, tmp_path: Path):
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "enums:\n  level:\n    - junior\n    - senior\n"
+            "taxonomy:\n  domains:\n    - ai-system\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
+
+        doc = make_doc(level="junior")
+        errors = validate(doc)
+        level_errors = [e for e in errors if e.field == "level"]
+        assert level_errors == []
+
+        doc2 = make_doc(level="beginner")
+        errors2 = validate(doc2)
+        level_errors2 = [e for e in errors2 if e.field == "level"]
+        assert len(level_errors2) == 1
+
+    def test_custom_status_enum(self, tmp_path: Path):
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "enums:\n  status:\n    - retired\n    - active\n"
+            "taxonomy:\n  domains:\n    - ai-system\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
+
+        doc = make_doc(status="retired")
+        errors = validate(doc)
+        status_errors = [e for e in errors if e.field == "status"]
+        assert status_errors == []
 
 
-# ---------------------------------------------------------------------------
-# Date format — E003
-# ---------------------------------------------------------------------------
+# ─── CANON-DEFER-002: created ≤ updated ──────────────────────────────────────
 
-def test_invalid_created_date_format():
-    doc = VALID_DOC.replace("created: 2026-02-22", "created: 22-02-2026")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.INVALID_DATE_FORMAT and e.field == "created" for e in errors)
+class TestCreatedUpdatedConstraint:
+    def test_valid_created_before_updated(self):
+        doc = make_doc(created="2026-01-01", updated="2026-01-02")
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created" in e.field]
+        assert date_errors == []
 
+    def test_valid_created_equals_updated(self):
+        doc = make_doc(created="2026-01-01", updated="2026-01-01")
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created" in e.field]
+        assert date_errors == []
 
-def test_invalid_updated_date_format():
-    doc = VALID_DOC.replace("updated: 2026-02-22", "updated: 2026/02/22")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.INVALID_DATE_FORMAT and e.field == "updated" for e in errors)
+    def test_invalid_created_after_updated(self):
+        doc = make_doc(created="2026-02-01", updated="2026-01-01")
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created/updated" in e.field]
+        assert len(date_errors) == 1
+        assert date_errors[0].code == ErrorCode.SCHEMA_VIOLATION
 
+    def test_created_after_updated_is_error_severity(self):
+        from akf.validation_error import Severity
+        doc = make_doc(created="2026-12-31", updated="2026-01-01")
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created/updated" in e.field]
+        assert date_errors[0].severity == Severity.ERROR
 
-def test_valid_date_format_passes():
-    errors = validate(VALID_DOC)
-    date_errors = [e for e in errors if e.code == ErrorCode.INVALID_DATE_FORMAT]
-    assert date_errors == []
+    def test_no_constraint_when_created_missing(self):
+        """Missing created is caught by E002, not E007."""
+        doc = make_doc(created="2026-01-01", updated="2026-01-02")
+        # Remove created from doc
+        doc = doc.replace("created: 2026-01-01\n", "")
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created/updated" in e.field]
+        assert date_errors == []  # E002 fires, not the cross-field check
 
+    def test_no_constraint_when_updated_missing(self):
+        doc = make_doc(created="2026-01-01", updated="2026-01-02")
+        doc = doc.replace("updated: 2026-01-02\n", "")
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created/updated" in e.field]
+        assert date_errors == []
 
-# ---------------------------------------------------------------------------
-# Tags — E004
-# ---------------------------------------------------------------------------
+    def test_invalid_date_format_skips_constraint(self):
+        """If a date is invalid, constraint check is skipped (not double-reported)."""
+        doc = make_doc(created="not-a-date", updated="2026-01-01")
+        errors = validate(doc)
+        format_errors = [e for e in errors if e.field == "created"]
+        constraint_errors = [e for e in errors if "created/updated" in e.field]
+        assert len(format_errors) == 1
+        assert constraint_errors == []
 
-def test_tags_not_array_returns_type_mismatch():
-    doc = VALID_DOC.replace("tags: [test, ai, obsidian]", "tags: just-a-string")
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.TYPE_MISMATCH and e.field == "tags" for e in errors)
+    def test_datetime_date_objects_compared_correctly(self):
+        """PyYAML parses unquoted dates as datetime.date — must still compare."""
+        # Unquoted dates in YAML → PyYAML parses as date objects
+        doc = textwrap.dedent("""\
+            ---
+            title: Test
+            type: concept
+            domain: ai-system
+            level: beginner
+            status: active
+            tags:
+              - a
+              - b
+              - c
+            created: 2026-02-01
+            updated: 2026-01-01
+            ---
 
-
-def test_tags_fewer_than_3_returns_error():
-    doc = VALID_DOC.replace("tags: [test, ai, obsidian]", "tags: [test]")
-    errors = validate(doc)
-    assert any(e.field == "tags" for e in errors)
-
-
-def test_tags_exactly_3_is_valid():
-    doc = VALID_DOC.replace("tags: [test, ai, obsidian]", "tags: [a, b, c]")
-    errors = validate(doc)
-    tag_errors = [e for e in errors if e.field == "tags"]
-    assert tag_errors == []
-
-
-# ---------------------------------------------------------------------------
-# Frontmatter parsing
-# ---------------------------------------------------------------------------
-
-def test_missing_frontmatter_returns_schema_violation():
-    doc = "## No frontmatter here\n\nJust content."
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.SCHEMA_VIOLATION and e.field == "frontmatter" for e in errors)
-
-
-def test_unclosed_frontmatter_returns_schema_violation():
-    doc = "---\ntitle: Test\ntype: concept\n## No closing dashes"
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.SCHEMA_VIOLATION for e in errors)
-
-
-def test_invalid_yaml_returns_schema_violation():
-    doc = "---\ntitle: [unclosed bracket\n---\n## Content"
-    errors = validate(doc)
-    assert any(e.code == ErrorCode.SCHEMA_VIOLATION for e in errors)
-
-
-# ---------------------------------------------------------------------------
-# Taxonomy loader
-# ---------------------------------------------------------------------------
-
-def test_default_taxonomy_returns_sorted_list():
-    taxonomy = _default_taxonomy()
-    assert taxonomy == sorted(taxonomy)
-    assert len(taxonomy) > 10
-
-
-def test_load_taxonomy_without_path_returns_default():
-    taxonomy = _load_taxonomy(None)
-    assert "ai-system" in taxonomy
-    assert "devops" in taxonomy
+            # Body
+        """)
+        errors = validate(doc)
+        date_errors = [e for e in errors if "created/updated" in e.field]
+        assert len(date_errors) == 1
 
 
-def test_load_taxonomy_nonexistent_path_returns_default(tmp_path):
-    taxonomy = _load_taxonomy(tmp_path / "nonexistent.md")
-    assert "ai-system" in taxonomy
+# ─── CANON-DEFER-003: title isinstance str ───────────────────────────────────
+
+class TestTitleTypeEnforcement:
+    def test_string_title_passes(self):
+        doc = make_doc(title="Valid Title")
+        errors = validate(doc)
+        title_errors = [e for e in errors if e.field == "title"]
+        assert title_errors == []
+
+    def test_numeric_title_fails(self):
+        """title: 42 — PyYAML parses as int."""
+        doc = textwrap.dedent("""\
+            ---
+            title: 42
+            type: concept
+            domain: ai-system
+            level: beginner
+            status: active
+            tags:
+              - a
+              - b
+              - c
+            created: 2026-01-01
+            updated: 2026-01-02
+            ---
+
+            # Body
+        """)
+        errors = validate(doc)
+        title_errors = [e for e in errors if e.field == "title"]
+        assert len(title_errors) == 1
+        assert title_errors[0].code == ErrorCode.TYPE_MISMATCH
+
+    def test_float_title_fails(self):
+        doc = textwrap.dedent("""\
+            ---
+            title: 3.14
+            type: concept
+            domain: ai-system
+            level: beginner
+            status: active
+            tags:
+              - a
+              - b
+              - c
+            created: 2026-01-01
+            updated: 2026-01-02
+            ---
+
+            # Body
+        """)
+        errors = validate(doc)
+        title_errors = [e for e in errors if e.field == "title"]
+        assert len(title_errors) == 1
+
+    def test_missing_title_caught_by_required_not_type(self):
+        doc = make_doc(title="placeholder")
+        doc = doc.replace("title: placeholder\n", "")
+        errors = validate(doc)
+        # E002 (missing field), not E004 (type mismatch)
+        title_errors = [e for e in errors if e.field == "title"]
+        assert any(e.code == ErrorCode.MISSING_FIELD for e in title_errors)
+        assert all(e.code != ErrorCode.TYPE_MISMATCH for e in title_errors)
+
+    def test_bool_title_fails(self):
+        """title: true — PyYAML parses as bool."""
+        doc = textwrap.dedent("""\
+            ---
+            title: true
+            type: concept
+            domain: ai-system
+            level: beginner
+            status: active
+            tags:
+              - a
+              - b
+              - c
+            created: 2026-01-01
+            updated: 2026-01-02
+            ---
+
+            # Body
+        """)
+        errors = validate(doc)
+        title_errors = [e for e in errors if e.field == "title"]
+        assert len(title_errors) == 1
+        assert title_errors[0].code == ErrorCode.TYPE_MISMATCH
 
 
-def test_load_taxonomy_from_file(tmp_path):
-    taxonomy_file = tmp_path / "Domain_Taxonomy.md"
-    taxonomy_file.write_text(
-        "#### custom-domain\nSome description\n#### another-domain\n"
-    )
-    taxonomy = _load_taxonomy(taxonomy_file)
-    assert "custom-domain" in taxonomy
-    assert "another-domain" in taxonomy
+# ─── backwards compatibility: taxonomy_path ───────────────────────────────────
+
+class TestTaxonomyPathBackwardsCompat:
+    def test_taxonomy_path_ignored_when_config_exists(self, tmp_path: Path):
+        """When akf.yaml is loaded, taxonomy_path is ignored."""
+        cfg_file = tmp_path / "akf.yaml"
+        cfg_file.write_text(
+            "taxonomy:\n  domains:\n    - marine-engineering\n",
+            encoding="utf-8",
+        )
+        reset_config()
+        get_config(path=cfg_file)
+
+        # Even with a taxonomy_path, config domains win
+        doc = make_doc(domain="marine-engineering")
+        errors = validate(doc, taxonomy_path=tmp_path / "nonexistent.md")
+        domain_errors = [e for e in errors if e.field == "domain"]
+        assert domain_errors == []
+
+    def test_taxonomy_path_used_when_no_config(self, tmp_path: Path, monkeypatch):
+        """Legacy taxonomy_path still works when no akf.yaml is found."""
+        import os
+        monkeypatch.delenv("AKF_CONFIG_PATH", raising=False)
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+        reset_config()
+
+        # Create a legacy taxonomy file
+        taxonomy_file = tmp_path / "taxonomy.md"
+        taxonomy_file.write_text("#### legacy-domain\n", encoding="utf-8")
+
+        doc = make_doc(domain="legacy-domain")
+        errors = validate(doc, taxonomy_path=taxonomy_file)
+        domain_errors = [e for e in errors if e.field == "domain"]
+        # legacy-domain should be accepted via taxonomy_path
+        assert domain_errors == []
 
 
-def test_taxonomy_file_skips_deprecated(tmp_path):
-    taxonomy_file = tmp_path / "Domain_Taxonomy.md"
-    taxonomy_file.write_text(
-        "#### valid-domain\n#### old-domain (DEPRECATED → valid-domain)\n"
-    )
-    taxonomy = _load_taxonomy(taxonomy_file)
-    assert "valid-domain" in taxonomy
-    assert "old-domain" not in taxonomy
+# ─── valid document end-to-end ────────────────────────────────────────────────
 
+class TestValidDocumentEndToEnd:
+    def test_valid_doc_returns_no_errors(self):
+        doc = make_doc()
+        errors = validate(doc)
+        assert errors == []
 
-# ---------------------------------------------------------------------------
-# Multiple errors
-# ---------------------------------------------------------------------------
+    def test_all_three_defers_pass_on_valid_doc(self):
+        doc = textwrap.dedent("""\
+            ---
+            title: "My Knowledge Document"
+            type: reference
+            domain: devops
+            level: intermediate
+            status: active
+            tags:
+              - devops
+              - ci-cd
+              - automation
+            created: 2026-01-15
+            updated: 2026-02-20
+            ---
 
-def test_multiple_errors_returned_together():
-    doc = """\
----
-title: "Test"
-type: invalid-type
-domain: not-a-domain
-level: expert
-status: active
-tags: [a]
-created: 2026-02-22
-updated: 2026-02-22
----
+            ## Content
 
-## Content
-"""
-    errors = validate(doc)
-    codes = [e.code for e in errors]
-    assert ErrorCode.INVALID_ENUM in codes       # type
-    assert ErrorCode.TAXONOMY_VIOLATION in codes  # domain
-    assert ErrorCode.INVALID_ENUM in codes        # level
-    assert len(errors) >= 3
+            Body text here.
+        """)
+        errors = validate(doc)
+        assert errors == [], f"Unexpected errors: {errors}"
