@@ -45,7 +45,8 @@ extend-exclude = '''
 
 [tool.setuptools]
 py-modules = ["cli", "validate_yaml", "llm_providers", "exceptions", "logger"]
-packages = ["akf"]
+packages = ["akf", "akf.defaults"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.yaml", "*.yml"]
+akf = ["defaults/*.yaml"]
