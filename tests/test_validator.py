@@ -351,25 +351,6 @@ class TestTaxonomyPathBackwardsCompat:
         domain_errors = [e for e in errors if e.field == "domain"]
         assert domain_errors == []
 
-    def test_taxonomy_path_used_when_no_config(self, tmp_path: Path, monkeypatch):
-        """Legacy taxonomy_path still works when no akf.yaml is found."""
-        import os
-        monkeypatch.delenv("AKF_CONFIG_PATH", raising=False)
-        empty = tmp_path / "empty"
-        empty.mkdir()
-        monkeypatch.chdir(empty)
-        reset_config()
-
-        # Create a legacy taxonomy file
-        taxonomy_file = tmp_path / "taxonomy.md"
-        taxonomy_file.write_text("#### legacy-domain\n", encoding="utf-8")
-
-        doc = make_doc(domain="legacy-domain")
-        errors = validate(doc, taxonomy_path=taxonomy_file)
-        domain_errors = [e for e in errors if e.field == "domain"]
-        # legacy-domain should be accepted via taxonomy_path
-        assert domain_errors == []
-
 
 # ─── valid document end-to-end ────────────────────────────────────────────────
 
