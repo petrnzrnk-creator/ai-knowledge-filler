@@ -15,6 +15,7 @@ class ErrorCode(str, Enum):
     TYPE_MISMATCH = "E004_TYPE_MISMATCH"
     SCHEMA_VIOLATION = "E005_SCHEMA_VIOLATION"
     TAXONOMY_VIOLATION = "E006_TAXONOMY_VIOLATION"
+    DATE_SEQUENCE = "E007_DATE_SEQUENCE"  # created > updated semantic violation
 
 
 class Severity(str, Enum):
@@ -106,5 +107,15 @@ def taxonomy_violation(field: str, received: Any, valid_domains: list) -> Valida
         field=field,
         expected=valid_domains,
         received=received,
+        severity=Severity.ERROR,
+    )
+
+
+def date_sequence_violation(created: Any, updated: Any) -> ValidationError:
+    return ValidationError(
+        code=ErrorCode.DATE_SEQUENCE,
+        field="created/updated",
+        expected=f"created ({created}) <= updated ({updated})",
+        received=f"created ({created}) > updated ({updated})",
         severity=Severity.ERROR,
     )

@@ -299,6 +299,10 @@ class TestFileDeletion:
 class TestFilePermissions:
     """Test file permission handling"""
     
+    @pytest.mark.skipif(
+        __import__("os").getuid() == 0,
+        reason="read-only chmod has no effect when running as root"
+    )
     def test_read_only_file(self):
         """Test handling read-only files"""
         temp_dir = tempfile.mkdtemp()

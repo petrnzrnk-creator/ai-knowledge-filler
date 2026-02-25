@@ -55,33 +55,27 @@ def err(msg: str) -> None:
 
 # ─── VALIDATE ─────────────────────────────────────────────────────────────────
 
-try:
-    from Scripts.validate_yaml import validate_file as _validate_file
-    _FULL_VALIDATOR = True
-except ImportError:
-    _FULL_VALIDATOR = False
+from akf.validator import validate as _akf_validate
+from akf.validation_error import Severity
+
+
+def _validate_file_impl(filepath: str, strict: bool = False) -> tuple[list[str], list[str]]:
+    """Adapter: wraps akf.validator.validate() to match cli expected signature."""
+    with open(filepath, encoding="utf-8") as _f:
+        content = _f.read()
+    all_errors = _akf_validate(content)
+    if strict:
+        error_msgs = [str(e) for e in all_errors]
+        warning_msgs: list[str] = []
+    else:
+        error_msgs = [str(e) for e in all_errors if e.severity == Severity.ERROR]
+        warning_msgs = [str(e) for e in all_errors if e.severity == Severity.WARNING]
+    return error_msgs, warning_msgs
 
 
 def validate_file(filepath: str, strict: bool = False) -> tuple[list[str], list[str]]:
-    """Валидация через validate_yaml (полная) или fallback (базовая)."""
-    if _FULL_VALIDATOR:
-        return _validate_file(filepath, strict=strict)
-    # Fallback: базовая проверка без validate_yaml
-    errors: list[str] = []
-    try:
-        import yaml
-        with open(filepath, "r", encoding="utf-8") as f:
-            content = f.read()
-        if not content.startswith("---"):
-            return ["No YAML frontmatter found"], []
-        parts = content.split("---", 2)
-        metadata = yaml.safe_load(parts[1]) or {}
-        for field in ["title", "type", "domain", "level", "status", "created", "updated"]:
-            if field not in metadata:
-                errors.append(f"Missing field: {field}")
-    except Exception as e:
-        errors.append(str(e))
-    return errors, []
+    """Validate a Markdown file using akf.validator (full E001-E007 enforcement)."""
+    return _validate_file_impl(filepath, strict=strict)
 
 
 def cmd_validate(args: argparse.Namespace) -> None:
@@ -161,7 +155,18 @@ def cmd_init(args: argparse.Namespace) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(default_config, target)
     ok(f"Created: {target}")
-    info("Edit akf.yaml to customize your taxonomy and enums.")
+    info("")
+    info("Next steps:")
+    info("  1. Edit akf.yaml — set vault_path and add your domains under taxonomy.domains")
+    info("  2. Set your LLM API key:")
+    info("       export ANTHROPIC_API_KEY=\'sk-ant-...\'   # Claude (recommended)")
+    info("       export GOOGLE_API_KEY=\'AIza...\'         # Gemini")
+    info("       export OPENAI_API_KEY=\'sk-...\'          # GPT-4")
+    info("       export GROQ_API_KEY=\'gsk_...\'           # Groq (fast + free tier)")
+    info("       # or run Ollama locally — no key needed")
+    info("  3. Generate your first file:")
+    info("       akf generate \"Create a concept about [topic] for the [domain] domain\"")
+    info("")
     info("Docs: https://github.com/petrnzrnk-creator/ai-knowledge-filler")
 
 
@@ -222,6 +227,19 @@ def cmd_generate(args: argparse.Namespace) -> None:
         provider = get_provider(args.model)
     except ValueError as e:
         err(str(e))
+        sys.exit(1)
+    except Exception as e:
+        # Catch ProviderUnavailableError (and subclasses) without hard import
+        if "ProviderUnavailableError" in type(e).__name__ or "unavailable" in str(e).lower():
+            err("No LLM provider available.")
+            info("Set one of these environment variables and retry:")
+            info("  export ANTHROPIC_API_KEY='sk-ant-...'")
+            info("  export GOOGLE_API_KEY='AIza...'")
+            info("  export OPENAI_API_KEY='sk-...'")
+            info("  export GROQ_API_KEY='gsk_...'")
+            info("Or run Ollama locally (no key needed): https://ollama.com")
+        else:
+            err(f"Provider error: {e}")
         sys.exit(1)
 
     system_prompt = load_system_prompt()

@@ -1,0 +1,330 @@
+Binary files ai-knowledge-filler/.coverage and akf-patched/.coverage differ
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/akf/defaults/akf.yaml akf-patched/akf/defaults/akf.yaml
+--- ai-knowledge-filler/akf/defaults/akf.yaml	2026-02-25 23:13:14.372245915 +0000
++++ akf-patched/akf/defaults/akf.yaml	2026-02-25 23:16:54.349147076 +0000
+@@ -1,6 +1,14 @@
+ schema_version: "1.0.0"
+ 
++# Path to your Obsidian vault (relative to this config file, or absolute).
++# Generated files will be written here.
++vault_path: "./vault"
++
+ taxonomy:
++  # Your knowledge domains — the controlled vocabulary for the `domain` field.
++  # Rules: lowercase-hyphenated only (e.g. api-design, not "API Design").
++  # Add or remove domains to match your knowledge base.
++  # Each domain should be distinct, non-overlapping, and expected to have 5+ files.
+   domains:
+     - ai-system
+     - api-design
+@@ -21,6 +29,7 @@
+     - ux-design
+ 
+ enums:
++  # Valid values for the `type` field. Edit sparingly — these shape file structure.
+   type:
+     - concept
+     - guide
+@@ -30,10 +39,14 @@
+     - roadmap
+     - template
+     - audit
++
++  # Valid values for the `level` field.
+   level:
+     - beginner
+     - intermediate
+     - advanced
++
++  # Valid values for the `status` field (lifecycle stages).
+   status:
+     - draft
+     - active
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/akf/error_normalizer.py akf-patched/akf/error_normalizer.py
+--- ai-knowledge-filler/akf/error_normalizer.py	2026-02-25 23:13:14.372245915 +0000
++++ akf-patched/akf/error_normalizer.py	2026-02-25 23:20:02.192062676 +0000
+@@ -94,6 +94,7 @@
+         ErrorCode.TYPE_MISMATCH:       _render_type_mismatch,
+         ErrorCode.SCHEMA_VIOLATION:    _render_schema_violation,
+         ErrorCode.TAXONOMY_VIOLATION:  _render_taxonomy_violation,
++        ErrorCode.DATE_SEQUENCE:        _render_date_sequence,
+     }
+     renderer = renderers.get(error.code, _render_generic)
+     return renderer(error)
+@@ -109,6 +110,13 @@
+ 
+ 
+ def _render_missing_field(e: ValidationError) -> str:
++    if e.field == "domain" and isinstance(e.expected, list):
++        domain_list = _format_list(e.expected)
++        return (
++            f"Field `{e.field}`: required but missing.\n"
++            f"   Add this field. Valid values are: {domain_list}.\n"
++            f"   Do not modify any other fields."
++        )
+     return (
+         f"Field `{e.field}`: required but missing.\n"
+         f"   Add this field with an appropriate value.\n"
+@@ -125,6 +133,13 @@
+ 
+ 
+ def _render_type_mismatch(e: ValidationError) -> str:
++    if e.field == "tags":
++        return (
++            f"Field `tags`: must be a YAML list (array), not a {e.received!r}.\n"
++            f"   Wrong:   tags: api\n"
++            f"   Correct: tags: [api, rest, design]\n"
++            f"   Minimum 3 items required. Do not modify any other fields."
++        )
+     return (
+         f"Field `{e.field}`: expected type {e.expected!r}, "
+         f"got {e.received!r}.\n"
+@@ -150,6 +165,14 @@
+     )
+ 
+ 
++def _render_date_sequence(e: ValidationError) -> str:
++    return (
++        f"Field `created`/`updated`: the `created` date must not be after `updated`.\n"
++        f"   {e.received}\n"
++        f"   Set `updated` to a date >= `created`. Do not modify any other fields."
++    )
++
++
+ def _render_generic(e: ValidationError) -> str:
+     return (
+         f"Field `{e.field}`: {e.code.value}.\n"
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/akf/validation_error.py akf-patched/akf/validation_error.py
+--- ai-knowledge-filler/akf/validation_error.py	2026-02-25 23:13:14.374245914 +0000
++++ akf-patched/akf/validation_error.py	2026-02-25 23:15:01.314197864 +0000
+@@ -15,6 +15,7 @@
+     TYPE_MISMATCH = "E004_TYPE_MISMATCH"
+     SCHEMA_VIOLATION = "E005_SCHEMA_VIOLATION"
+     TAXONOMY_VIOLATION = "E006_TAXONOMY_VIOLATION"
++    DATE_SEQUENCE = "E007_DATE_SEQUENCE"  # created > updated semantic violation
+ 
+ 
+ class Severity(str, Enum):
+@@ -108,3 +109,13 @@
+         received=received,
+         severity=Severity.ERROR,
+     )
++
++
++def date_sequence_violation(created: Any, updated: Any) -> ValidationError:
++    return ValidationError(
++        code=ErrorCode.DATE_SEQUENCE,
++        field="created/updated",
++        expected=f"created ({created}) <= updated ({updated})",
++        received=f"created ({created}) > updated ({updated})",
++        severity=Severity.ERROR,
++    )
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/akf/validator.py akf-patched/akf/validator.py
+--- ai-knowledge-filler/akf/validator.py	2026-02-25 23:13:14.375245913 +0000
++++ akf-patched/akf/validator.py	2026-02-25 23:19:15.520083646 +0000
+@@ -33,6 +33,7 @@
+     ErrorCode,
+     Severity,
+     ValidationError,
++    date_sequence_violation,
+     invalid_date_format,
+     invalid_enum,
+     missing_field,
+@@ -91,6 +92,7 @@
+     errors.extend(_check_taxonomy(metadata, valid_domains))
+     errors.extend(_check_dates(metadata))                # includes CANON-DEFER-002
+     errors.extend(_check_tags(metadata))
++    errors.extend(_check_related(metadata))              # WARNING: recommended field
+ 
+     return errors
+ 
+@@ -227,17 +229,11 @@
+                 errors.append(invalid_date_format(field_name, str(value)))
+                 resolved[field_name] = None
+ 
+-    # CANON-DEFER-002: created ≤ updated
++    # CANON-DEFER-002: created ≤ updated (E007_DATE_SEQUENCE)
+     c = resolved.get("created")
+     u = resolved.get("updated")
+     if c is not None and u is not None and c > u:
+-        errors.append(ValidationError(
+-            code=ErrorCode.SCHEMA_VIOLATION,
+-            field="created/updated",
+-            expected=f"created ({c}) ≤ updated ({u})",
+-            received=f"created ({c}) > updated ({u})",
+-            severity=Severity.ERROR,
+-        ))
++        errors.append(date_sequence_violation(c, u))
+ 
+     return errors
+ 
+@@ -258,6 +254,20 @@
+         )]
+     return []
+ 
++
++def _check_related(metadata: dict) -> list[ValidationError]:
++    """W001: related field missing or empty — warning only, never blocks commit."""
++    related = metadata.get("related")
++    if not related:
++        return [ValidationError(
++            code=ErrorCode.SCHEMA_VIOLATION,
++            field="related",
++            expected="list with >= 1 WikiLink",
++            received="absent" if related is None else "empty list",
++            severity=Severity.WARNING,
++        )]
++    return []
++
+ 
+ # ---------------------------------------------------------------------------
+ # Legacy taxonomy loader (backwards compatibility — taxonomy_path API)
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/cli.py akf-patched/cli.py
+--- ai-knowledge-filler/cli.py	2026-02-25 23:13:14.375245913 +0000
++++ akf-patched/cli.py	2026-02-25 23:14:51.294202366 +0000
+@@ -55,33 +55,27 @@
+ 
+ # ─── VALIDATE ─────────────────────────────────────────────────────────────────
+ 
+-try:
+-    from Scripts.validate_yaml import validate_file as _validate_file
+-    _FULL_VALIDATOR = True
+-except ImportError:
+-    _FULL_VALIDATOR = False
++from akf.validator import validate as _akf_validate
++from akf.validation_error import Severity
++
++
++def _validate_file_impl(filepath: str, strict: bool = False) -> tuple[list[str], list[str]]:
++    """Adapter: wraps akf.validator.validate() to match cli expected signature."""
++    with open(filepath, encoding="utf-8") as _f:
++        content = _f.read()
++    all_errors = _akf_validate(content)
++    if strict:
++        error_msgs = [str(e) for e in all_errors]
++        warning_msgs: list[str] = []
++    else:
++        error_msgs = [str(e) for e in all_errors if e.severity == Severity.ERROR]
++        warning_msgs = [str(e) for e in all_errors if e.severity == Severity.WARNING]
++    return error_msgs, warning_msgs
+ 
+ 
+ def validate_file(filepath: str, strict: bool = False) -> tuple[list[str], list[str]]:
+-    """Валидация через validate_yaml (полная) или fallback (базовая)."""
+-    if _FULL_VALIDATOR:
+-        return _validate_file(filepath, strict=strict)
+-    # Fallback: базовая проверка без validate_yaml
+-    errors: list[str] = []
+-    try:
+-        import yaml
+-        with open(filepath, "r", encoding="utf-8") as f:
+-            content = f.read()
+-        if not content.startswith("---"):
+-            return ["No YAML frontmatter found"], []
+-        parts = content.split("---", 2)
+-        metadata = yaml.safe_load(parts[1]) or {}
+-        for field in ["title", "type", "domain", "level", "status", "created", "updated"]:
+-            if field not in metadata:
+-                errors.append(f"Missing field: {field}")
+-    except Exception as e:
+-        errors.append(str(e))
+-    return errors, []
++    """Validate a Markdown file using akf.validator (full E001-E007 enforcement)."""
++    return _validate_file_impl(filepath, strict=strict)
+ 
+ 
+ def cmd_validate(args: argparse.Namespace) -> None:
+@@ -161,7 +155,18 @@
+     target_dir.mkdir(parents=True, exist_ok=True)
+     shutil.copy(default_config, target)
+     ok(f"Created: {target}")
+-    info("Edit akf.yaml to customize your taxonomy and enums.")
++    info("")
++    info("Next steps:")
++    info("  1. Edit akf.yaml — set vault_path and add your domains under taxonomy.domains")
++    info("  2. Set your LLM API key:")
++    info("       export ANTHROPIC_API_KEY=\'sk-ant-...\'   # Claude (recommended)")
++    info("       export GOOGLE_API_KEY=\'AIza...\'         # Gemini")
++    info("       export OPENAI_API_KEY=\'sk-...\'          # GPT-4")
++    info("       export GROQ_API_KEY=\'gsk_...\'           # Groq (fast + free tier)")
++    info("       # or run Ollama locally — no key needed")
++    info("  3. Generate your first file:")
++    info("       akf generate \"Create a concept about [topic] for the [domain] domain\"")
++    info("")
+     info("Docs: https://github.com/petrnzrnk-creator/ai-knowledge-filler")
+ 
+ 
+@@ -223,6 +228,19 @@
+     except ValueError as e:
+         err(str(e))
+         sys.exit(1)
++    except Exception as e:
++        # Catch ProviderUnavailableError (and subclasses) without hard import
++        if "ProviderUnavailableError" in type(e).__name__ or "unavailable" in str(e).lower():
++            err("No LLM provider available.")
++            info("Set one of these environment variables and retry:")
++            info("  export ANTHROPIC_API_KEY='sk-ant-...'")
++            info("  export GOOGLE_API_KEY='AIza...'")
++            info("  export OPENAI_API_KEY='sk-...'")
++            info("  export GROQ_API_KEY='gsk_...'")
++            info("Or run Ollama locally (no key needed): https://ollama.com")
++        else:
++            err(f"Provider error: {e}")
++        sys.exit(1)
+ 
+     system_prompt = load_system_prompt()
+     info(f'Generating via {provider.display_name}...')
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/pyproject.toml akf-patched/pyproject.toml
+--- ai-knowledge-filler/pyproject.toml	2026-02-25 23:13:14.378245912 +0000
++++ akf-patched/pyproject.toml	2026-02-25 23:17:06.944141417 +0000
+@@ -1,6 +1,6 @@
+ [project]
+ name = "ai-knowledge-filler"
+-version = "0.3.0"
++version = "0.4.0"
+ description = "Deterministic knowledge compiler for LLM output"
+ readme = "README.md"
+ license = "MIT"
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/tests/integration/test_file_operations.py akf-patched/tests/integration/test_file_operations.py
+--- ai-knowledge-filler/tests/integration/test_file_operations.py	2026-02-25 23:13:14.380245911 +0000
++++ akf-patched/tests/integration/test_file_operations.py	2026-02-25 23:20:46.880042597 +0000
+@@ -299,6 +299,10 @@
+ class TestFilePermissions:
+     """Test file permission handling"""
+     
++    @pytest.mark.skipif(
++        __import__("os").getuid() == 0,
++        reason="read-only chmod has no effect when running as root"
++    )
+     def test_read_only_file(self):
+         """Test handling read-only files"""
+         temp_dir = tempfile.mkdtemp()
+diff -ruN '--exclude=*.pyc' '--exclude=__pycache__' '--exclude=*.egg-info' '--exclude=dist' '--exclude=build' '--exclude=htmlcov' '--exclude=.git' '--exclude=.pytest_cache' ai-knowledge-filler/tests/test_validator.py akf-patched/tests/test_validator.py
+--- ai-knowledge-filler/tests/test_validator.py	2026-02-25 23:13:14.384245909 +0000
++++ akf-patched/tests/test_validator.py	2026-02-25 23:20:31.085049694 +0000
+@@ -29,6 +29,7 @@
+         "level": "beginner",
+         "status": "active",
+         "tags": ["a", "b", "c"],
++        "related": ["[[Test Link]]"],
+         "created": "2026-01-01",
+         "updated": "2026-01-02",
+     }
+@@ -184,7 +185,7 @@
+         errors = validate(doc)
+         date_errors = [e for e in errors if "created/updated" in e.field]
+         assert len(date_errors) == 1
+-        assert date_errors[0].code == ErrorCode.SCHEMA_VIOLATION
++        assert date_errors[0].code == ErrorCode.DATE_SEQUENCE
+ 
+     def test_created_after_updated_is_error_severity(self):
+         from akf.validation_error import Severity
+@@ -372,6 +373,8 @@
+               - devops
+               - ci-cd
+               - automation
++            related:
++              - "[[Some Reference]]"
+             created: 2026-01-15
+             updated: 2026-02-20
+             ---

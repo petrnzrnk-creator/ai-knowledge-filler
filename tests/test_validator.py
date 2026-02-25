@@ -29,6 +29,7 @@ def make_doc(**overrides) -> str:
         "level": "beginner",
         "status": "active",
         "tags": ["a", "b", "c"],
+        "related": ["[[Test Link]]"],
         "created": "2026-01-01",
         "updated": "2026-01-02",
     }
@@ -184,7 +185,7 @@ class TestCreatedUpdatedConstraint:
         errors = validate(doc)
         date_errors = [e for e in errors if "created/updated" in e.field]
         assert len(date_errors) == 1
-        assert date_errors[0].code == ErrorCode.SCHEMA_VIOLATION
+        assert date_errors[0].code == ErrorCode.DATE_SEQUENCE
 
     def test_created_after_updated_is_error_severity(self):
         from akf.validation_error import Severity
@@ -372,6 +373,8 @@ class TestValidDocumentEndToEnd:
               - devops
               - ci-cd
               - automation
+            related:
+              - "[[Some Reference]]"
             created: 2026-01-15
             updated: 2026-02-20
             ---

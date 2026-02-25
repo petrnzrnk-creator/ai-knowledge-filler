@@ -1,6 +1,14 @@
 schema_version: "1.0.0"
 
+# Path to your Obsidian vault (relative to this config file, or absolute).
+# Generated files will be written here.
+vault_path: "./vault"
+
 taxonomy:
+  # Your knowledge domains — the controlled vocabulary for the `domain` field.
+  # Rules: lowercase-hyphenated only (e.g. api-design, not "API Design").
+  # Add or remove domains to match your knowledge base.
+  # Each domain should be distinct, non-overlapping, and expected to have 5+ files.
   domains:
     - ai-system
     - api-design
@@ -21,6 +29,7 @@ taxonomy:
     - ux-design
 
 enums:
+  # Valid values for the `type` field. Edit sparingly — these shape file structure.
   type:
     - concept
     - guide
@@ -30,10 +39,14 @@ enums:
     - roadmap
     - template
     - audit
+
+  # Valid values for the `level` field.
   level:
     - beginner
     - intermediate
     - advanced
+
+  # Valid values for the `status` field (lifecycle stages).
   status:
     - draft
     - active

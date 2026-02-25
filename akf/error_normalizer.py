@@ -94,6 +94,7 @@ def _render_instruction(error: ValidationError) -> str:
         ErrorCode.TYPE_MISMATCH:       _render_type_mismatch,
         ErrorCode.SCHEMA_VIOLATION:    _render_schema_violation,
         ErrorCode.TAXONOMY_VIOLATION:  _render_taxonomy_violation,
+        ErrorCode.DATE_SEQUENCE:        _render_date_sequence,
     }
     renderer = renderers.get(error.code, _render_generic)
     return renderer(error)
@@ -109,6 +110,13 @@ def _render_invalid_enum(e: ValidationError) -> str:
 
 
 def _render_missing_field(e: ValidationError) -> str:
+    if e.field == "domain" and isinstance(e.expected, list):
+        domain_list = _format_list(e.expected)
+        return (
+            f"Field `{e.field}`: required but missing.\n"
+            f"   Add this field. Valid values are: {domain_list}.\n"
+            f"   Do not modify any other fields."
+        )
     return (
         f"Field `{e.field}`: required but missing.\n"
         f"   Add this field with an appropriate value.\n"
@@ -125,6 +133,13 @@ def _render_invalid_date_format(e: ValidationError) -> str:
 
 
 def _render_type_mismatch(e: ValidationError) -> str:
+    if e.field == "tags":
+        return (
+            f"Field `tags`: must be a YAML list (array), not a {e.received!r}.\n"
+            f"   Wrong:   tags: api\n"
+            f"   Correct: tags: [api, rest, design]\n"
+            f"   Minimum 3 items required. Do not modify any other fields."
+        )
     return (
         f"Field `{e.field}`: expected type {e.expected!r}, "
         f"got {e.received!r}.\n"
@@ -147,6 +162,14 @@ def _render_taxonomy_violation(e: ValidationError) -> str:
         f"{expected_str}.\n"
         f"   You provided: {e.received!r}. Replace with a taxonomy value.\n"
         f"   Do not modify any other fields."
+    )
+
+
+def _render_date_sequence(e: ValidationError) -> str:
+    return (
+        f"Field `created`/`updated`: the `created` date must not be after `updated`.\n"
+        f"   {e.received}\n"
+        f"   Set `updated` to a date >= `created`. Do not modify any other fields."
     )
 
 

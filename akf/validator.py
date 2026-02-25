@@ -33,6 +33,7 @@ from akf.validation_error import (
     ErrorCode,
     Severity,
     ValidationError,
+    date_sequence_violation,
     invalid_date_format,
     invalid_enum,
     missing_field,
@@ -91,6 +92,7 @@ def validate(document: str, taxonomy_path: Path | None = None) -> list[Validatio
     errors.extend(_check_taxonomy(metadata, valid_domains))
     errors.extend(_check_dates(metadata))                # includes CANON-DEFER-002
     errors.extend(_check_tags(metadata))
+    errors.extend(_check_related(metadata))              # WARNING: recommended field
 
     return errors
 
@@ -227,17 +229,11 @@ def _check_dates(metadata: dict) -> list[ValidationError]:
                 errors.append(invalid_date_format(field_name, str(value)))
                 resolved[field_name] = None
 
-    # CANON-DEFER-002: created ≤ updated
+    # CANON-DEFER-002: created ≤ updated (E007_DATE_SEQUENCE)
     c = resolved.get("created")
     u = resolved.get("updated")
     if c is not None and u is not None and c > u:
-        errors.append(ValidationError(
-            code=ErrorCode.SCHEMA_VIOLATION,
-            field="created/updated",
-            expected=f"created ({c}) ≤ updated ({u})",
-            received=f"created ({c}) > updated ({u})",
-            severity=Severity.ERROR,
-        ))
+        errors.append(date_sequence_violation(c, u))
 
     return errors
 
@@ -255,6 +251,20 @@ def _check_tags(metadata: dict) -> list[ValidationError]:
             field="tags",
             expected=f"list with >= {TAGS_MIN} items",
             received=f"list with {len(tags)} items",
+        )]
+    return []
+
+
+def _check_related(metadata: dict) -> list[ValidationError]:
+    """W001: related field missing or empty — warning only, never blocks commit."""
+    related = metadata.get("related")
+    if not related:
+        return [ValidationError(
+            code=ErrorCode.SCHEMA_VIOLATION,
+            field="related",
+            expected="list with >= 1 WikiLink",
+            received="absent" if related is None else "empty list",
+            severity=Severity.WARNING,
         )]
     return []
 
