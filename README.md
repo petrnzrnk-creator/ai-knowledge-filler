@@ -438,7 +438,7 @@ LLMs are **deterministic infrastructure**, not conversational toys.
 **Created by:** Petr — AI Solutions Architect
 **PyPI:** https://pypi.org/project/ai-knowledge-filler/
 **Repository:** https://github.com/petrnzrnk-creator/ai-knowledge-filler
-**Version:** 0.3.0
+**Version:** 0.4.1
 
 ---
 
