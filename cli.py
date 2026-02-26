@@ -413,6 +413,13 @@ def main() -> int:
     # Models command
     models = sub.add_parser("models", help="List available LLM providers")
 
+    # Serve command
+
+
+    srv = sub.add_parser("serve", help="Start REST API server")
+    srv.add_argument("--host", default="0.0.0.0")
+    srv.add_argument("--port", type=int, default=8000)
+
     args = parser.parse_args()
     if args.command == "init":
         cmd_init(args)
@@ -422,8 +429,29 @@ def main() -> int:
         cmd_validate(args)
     elif args.command == "models":
         cmd_models(args)
+    elif args.command == "serve":
+        cmd_serve(args)
     return 0
 
+
+
+
+# ─── SERVE ────────────────────────────────────────────────────────────────────
+
+
+def cmd_serve(args):
+    """Start AKF REST API server."""
+    try:
+        import uvicorn
+    except ImportError:
+        err("uvicorn not installed. Run: pip install uvicorn")
+        sys.exit(1)
+
+    host = getattr(args, "host", "0.0.0.0")
+    port = getattr(args, "port", 8000)
+    info(f"Starting AKF API on http://{host}:{port}")
+    info(f"Docs: http://{host}:{port}/docs")
+    uvicorn.run("akf.server:app", host=host, port=port, reload=False)
 
 if __name__ == "__main__":
     main()
