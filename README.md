@@ -323,11 +323,11 @@ type: template     # Reusable template
 
 ## Documentation
 
-- [System Prompt](akf/system_prompt.md) — LLM behavior definition
-- [User Guide](docs/user-guide.md) — Installation, quick start, troubleshooting
-- [CLI Reference](docs/cli-reference.md) — All commands, flags, env vars, exit codes
-- [Architecture](ARCHITECTURE.md) — Module map, data flow, extension points
-- [Contributing](CONTRIBUTING.md) — Dev setup, quality gates, adding providers
+- [System Prompt](https://github.com/petrnzrnk-creator/ai-knowledge-filler/blob/main/akf/system_prompt.md) — LLM behavior definition
+- [User Guide](https://github.com/petrnzrnk-creator/ai-knowledge-filler/blob/main/docs/user-guide.md) — Installation, quick start, troubleshooting
+- [CLI Reference](https://github.com/petrnzrnk-creator/ai-knowledge-filler/blob/main/docs/cli-reference.md) — All commands, flags, env vars, exit codes
+- [Architecture](https://github.com/petrnzrnk-creator/ai-knowledge-filler/blob/main/ARCHITECTURE.md) — Module map, data flow, extension points
+- [Contributing](https://github.com/petrnzrnk-creator/ai-knowledge-filler/blob/main/CONTRIBUTING.md) — Dev setup, quality gates, adding providers
 
 ---
 

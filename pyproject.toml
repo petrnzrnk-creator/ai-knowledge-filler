@@ -1,6 +1,6 @@
 [project]
 name = "ai-knowledge-filler"
-version = "0.4.0"
+version = "0.4.1"
 description = "Deterministic knowledge compiler for LLM output"
 readme = "README.md"
 license = "MIT"
