@@ -8,7 +8,7 @@
 [![PyPI](https://img.shields.io/pypi/v/ai-knowledge-filler.svg)](https://pypi.org/project/ai-knowledge-filler/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen.svg)](https://github.com/petrnzrnk-creator/ai-knowledge-filler/actions/workflows/tests.yml)
 [![Pylint](https://img.shields.io/badge/pylint-9.55%2F10-brightgreen)](https://github.com/petrnzrnk-creator/ai-knowledge-filler)
 
 ---
@@ -73,7 +73,41 @@ akf generate "Create Docker security checklist"
 
 **Output:** `outputs/Docker_Security_Checklist.md` — production-ready, validated.
 
-### Option 2: Claude Projects (No CLI)
+### Option 2: Python API (Stage 2)
+
+```python
+from akf import Pipeline
+
+pipeline = Pipeline(output="./vault/")
+
+# Single file
+result = pipeline.generate("Create Docker security checklist")
+print(result.path, result.attempts)
+
+# Batch
+results = pipeline.batch_generate([
+    "Docker deployment guide",
+    "Kubernetes security hardening",
+    "API authentication strategies",
+])
+```
+
+### Option 3: REST API (Stage 3)
+
+```bash
+# Start server
+akf serve --port 8000
+
+# Generate via HTTP
+curl -X POST http://localhost:8000/v1/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Create Docker security checklist"}'
+
+# Swagger UI
+open http://localhost:8000/docs
+```
+
+### Option 4: Claude Projects (No CLI)
 
 ```
 1. Open Claude.ai → Create new Project
@@ -96,7 +130,7 @@ akf generate "Create Docker security checklist"
 - **CLI** — Multi-LLM interface (Claude, Gemini, GPT-4, Ollama)
 
 ### Quality Assurance
-- ✅ 97% test coverage (165 tests)
+- ✅ 88% test coverage (425 tests)
 - ✅ Automated YAML validation
 - ✅ CI/CD pipelines (GitHub Actions)
 - ✅ Type hints (100% coverage)
@@ -128,6 +162,18 @@ akf validate --file outputs/Guide.md
 # All files in outputs/
 akf validate
 ```
+
+### Start REST API Server
+
+```bash
+akf serve
+akf serve --port 8001
+akf serve --host 0.0.0.0 --port 8000
+```
+
+**Endpoints:** `POST /v1/generate` · `POST /v1/validate` · `POST /v1/batch` · `GET /v1/models` · `GET /health`
+
+Swagger UI: `http://localhost:8000/docs`
 
 ### List Available Models
 
@@ -284,9 +330,9 @@ akf validate
 pylint *.py tests/
 ```
 
-**Coverage:** 97% (165 tests)
+**Coverage:** 88% (425 tests)
 **Linting:** Pylint 9.55/10
-**CI/CD:** All checks passing
+**CI/CD:** All checks passing (Python 3.10/3.11/3.12)
 
 ---
 
@@ -333,30 +379,57 @@ type: template     # Reusable template
 
 ## Advanced Usage
 
-### Programmatic Generation
+### Python API
 
 ```python
-from llm_providers import get_provider
+from akf import Pipeline
 
-# Auto-select provider
-provider = get_provider("auto")
-
-# Load system prompt
-with open('akf/system_prompt.md') as f:
-    system_prompt = f.read()
-
-# Generate
-content = provider.generate(
-    prompt="Create API security checklist",
-    system_prompt=system_prompt
+# Initialize once
+pipeline = Pipeline(
+    output="./vault/",
+    model="groq",           # optional, auto-selects if omitted
+    telemetry_path="./telemetry/",
 )
 
-# Save
-with open('outputs/Security_Checklist.md', 'w') as f:
-    f.write(content)
+# Single file — returns GenerateResult
+result = pipeline.generate("Create API security checklist")
+print(result.success)        # True
+print(result.path)           # PosixPath('vault/API_Security_Checklist.md')
+print(result.attempts)       # 1
+print(result.generation_id)  # uuid4 for telemetry join
+
+# Batch — returns list[GenerateResult]
+results = pipeline.batch_generate([
+    "Docker deployment best practices",
+    "Kubernetes security hardening",
+    "API authentication strategies",
+])
+
+# Validate existing file
+v = pipeline.validate("vault/my_file.md")
+print(v.valid, v.errors)
 ```
 
-### Batch Processing
+### REST API
+
+```bash
+# Start server
+akf serve --port 8000
+
+# Generate
+curl -X POST http://localhost:8000/v1/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Create Docker security checklist", "model": "groq"}'
+
+# Batch
+curl -X POST http://localhost:8000/v1/batch \
+  -H "Content-Type: application/json" \
+  -d '{"prompts": ["Docker guide", "Kubernetes guide"]}'
+```
+
+**Full API docs:** `http://localhost:8000/docs` (Swagger UI, auto-generated)
+
+### Batch via CLI
 
 ```bash
 cat > topics.txt << 'EOF'
@@ -369,7 +442,6 @@ while read topic; do
     akf generate "Create guide on $topic" --model gemini
 done < topics.txt
 ```
-
 ---
 
 ## Validation
@@ -398,25 +470,38 @@ done < topics.txt
 - [x] System Prompt (universal LLM compatibility)
 - [x] YAML Metadata Standard
 - [x] Domain Taxonomy (30+ domains)
-- [x] Validation Script (96% test coverage, 104 tests)
-- [x] Multi-LLM CLI (Claude, Gemini, GPT-4, Ollama)
+- [x] Validation Script
+- [x] Multi-LLM CLI (Claude, Gemini, GPT-4, Ollama, Groq)
 - [x] CI/CD Pipelines (GitHub Actions)
 - [x] PyPI package (`pip install ai-knowledge-filler`)
 
 ### v0.2.x ✅ (Shipped)
-- [x] Validation pipeline (Phase 2.1 — ValidationError, Error Normalizer, Retry Controller, Commit Gate)
-- [x] Hard enum enforcement — E001–E006, 97% coverage (Phase 2.2)
-- [x] Telemetry layer — append-only JSONL, generation_id, convergence metrics (Phase 2.3)
+- [x] Validation pipeline (ValidationError, Error Normalizer, Retry Controller, Commit Gate)
+- [x] Hard enum enforcement — E001–E006
+- [x] Telemetry layer — append-only JSONL, generation_id, convergence metrics
 
-### v0.3.0 🔄 (Current)
-- [x] Config layer — external `akf.yaml`, taxonomy configurable without code changes (Phase 2.4)
+### v0.3.0 ✅ (Shipped)
+- [x] Config layer — external `akf.yaml`, taxonomy configurable without code changes
 - [x] `akf init` — generates `akf.yaml` for a new vault
-- [x] Validator Model D — `created ≤ updated` (E007), `title` isinstance str (E004)
-- [ ] PyPI publish pending tag
+- [x] Validator Model D — `created ≤ updated` (E007)
 
-### v1.0.0 (Planned — Phase 2.5)
-- [ ] Onboarding & public announcement
----
+### v0.4.x ✅ (Current)
+- [x] Marine crew domain pilot — 20-year practitioner taxonomy
+- [x] Onboarding layer — README v2, Quickstart, CONTRIBUTING, error audit
+- [x] **Pipeline API** — `from akf import Pipeline` (Stage 2)
+- [x] **REST API** — `akf serve`, FastAPI, Swagger UI (Stage 3)
+- [x] 425 tests, 88% coverage, CI green Python 3.10/3.11/3.12
+
+### v1.0.0 (Planned)
+- [ ] Telegram Bot connector
+- [ ] HackerNews Show HN launch
+- [ ] First paying user
+
+### Later
+- [ ] Web UI
+- [ ] n8n / Make integration templates
+- [ ] Graph extraction layer
+
 
 ## License
 
