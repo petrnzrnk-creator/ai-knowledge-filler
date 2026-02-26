@@ -14,8 +14,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
           pip install pytest pytest-cov pytest-mock fastapi uvicorn httpx
+          pip install -e ".[all]"
       - name: Run tests
         run: pytest --tb=short --ignore=tests/integration
 
