@@ -27,6 +27,21 @@ class ValidateResult:
         s = "VALID" if self.valid else "INVALID"
         return f"ValidateResult({s}, errors={len(self.errors)}, warnings={len(self.warnings)})"
 
+
+def _inject_schema_version(content: str, version: str = "1.0.0") -> str:
+    """Inject schema_version into YAML frontmatter if absent."""
+    import re
+    if "schema_version" in content:
+        return content
+    # Insert after first ---\n
+    return re.sub(
+        r"^(---\n)",
+        f"---\nschema_version: \"{version}\"\n",
+        content,
+        count=1,
+        flags=re.MULTILINE,
+    )
+
 class Pipeline:
     def __init__(self, output=None, model="auto", telemetry_path=None, verbose=True):
         self.model = model
