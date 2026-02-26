@@ -14,7 +14,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install pyyaml pytest pytest-cov
+        run: pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-mock fastapi uvicorn httpx
       - name: Run tests
         run: pytest --tb=short --ignore=tests/integration
 
