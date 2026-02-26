@@ -494,8 +494,8 @@ done < topics.txt
 
 ### v1.0.0 (Planned)
 - [ ] Telegram Bot connector
-- [ ] HackerNews Show HN launch
-- [ ] First paying user
+- [ ] Web UI
+- [ ] n8n / Make integration templates
 
 ### Later
 - [ ] Web UI
