@@ -51,3 +51,5 @@ build/
 dist/
 *.egg-info/
 .obsidian/
+.pylint_cache
+FETCH_HEAD
