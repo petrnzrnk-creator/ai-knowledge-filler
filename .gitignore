@@ -53,3 +53,4 @@ dist/
 .obsidian/
 .pylint_cache
 FETCH_HEAD
+telemetry/
