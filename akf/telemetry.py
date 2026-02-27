@@ -167,6 +167,45 @@ class GenerationSummaryEvent:
 
 # ─── WRITER ───────────────────────────────────────────────────────────────────
 
+
+
+@dataclass
+class EnrichEvent:
+    """One telemetry event per enriched file (ADR-001 Decision 9)."""
+    generation_id: str
+    file: str
+    schema_version: str
+    existing_fields: list[str]
+    generated_fields: list[str]
+    attempts: int
+    converged: bool
+    skipped: bool
+    skip_reason: str
+    model: str
+    temperature: float = 0.0
+    event_type: str = field(default="enrich", init=False)
+    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: str = field(default_factory=lambda: _utc_now())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "event_id": self.event_id,
+            "timestamp": self.timestamp,
+            "generation_id": self.generation_id,
+            "file": self.file,
+            "schema_version": self.schema_version,
+            "existing_fields": self.existing_fields,
+            "generated_fields": self.generated_fields,
+            "attempts": self.attempts,
+            "converged": self.converged,
+            "skipped": self.skipped,
+            "skip_reason": self.skip_reason,
+            "model": self.model,
+            "temperature": self.temperature,
+        }
+
+
 class TelemetryWriter:
     """Append-only thread-safe JSONL writer for AKF telemetry events.
 
@@ -186,7 +225,7 @@ class TelemetryWriter:
         self._path = Path(path)
         self._lock = threading.Lock()
 
-    def write(self, event: GenerationAttemptEvent | GenerationSummaryEvent) -> None:
+    def write(self, event: GenerationAttemptEvent | GenerationSummaryEvent | EnrichEvent) -> None:
         """Serialize event to JSONL and append to telemetry file.
 
         Args:
