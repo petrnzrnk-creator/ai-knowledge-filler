@@ -246,3 +246,33 @@ class TestPipelineBatchGenerate:
         p = Pipeline(output=str(tmp_path), verbose=False)
         results = p.batch_generate([])
         assert results == []
+
+    def test_batch_reuses_single_provider(self, tmp_path):
+        """Provider must be instantiated once per batch, not once per item.
+
+        Creating a new SDK client (e.g. Groq) for every generate() call leaves
+        idle keep-alive connections open.  Providers with per-key connection
+        limits (Groq) hold subsequent connections indefinitely → hang.
+        Caching the provider in Pipeline._provider_cache fixes this.
+        """
+        p = Pipeline(output=str(tmp_path), verbose=False)
+        prompts = ["Prompt 1", "Prompt 2", "Prompt 3"]
+        with patch("akf.pipeline.Pipeline._load_system_prompt", return_value="sys"):
+            with patch("llm_providers.get_provider", return_value=make_mock_provider()) as mock_get:
+                p.batch_generate(prompts)
+        assert mock_get.call_count == 1  # one provider for all 3 items
+
+    def test_batch_provider_timeout_returns_failed_result(self, tmp_path):
+        """A provider exception (e.g. timeout) must produce a failed GenerateResult
+        for that item and allow the rest of the batch to continue — never hang."""
+        p = Pipeline(output=str(tmp_path), verbose=False)
+        mock_provider = make_mock_provider()
+        # First item succeeds, second raises a timeout-style exception
+        mock_provider.generate.side_effect = [VALID_CONTENT, Exception("Connection timed out")]
+        with patch("akf.pipeline.Pipeline._load_system_prompt", return_value="sys"):
+            with patch("llm_providers.get_provider", return_value=mock_provider):
+                results = p.batch_generate(["Prompt 1", "Prompt 2"])
+        assert len(results) == 2
+        assert results[0].success is True
+        assert results[1].success is False
+        assert len(results[1].errors) > 0

@@ -435,7 +435,7 @@ class GroqProvider(LLMProvider):
             )
 
         try:
-            client = Groq(api_key=self.api_key)
+            client = Groq(api_key=self.api_key, timeout=120.0)
             response = client.chat.completions.create(
                 model=self.model_name,
                 messages=[

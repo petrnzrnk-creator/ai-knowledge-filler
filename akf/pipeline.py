@@ -65,6 +65,10 @@ class Pipeline:
         self.output_dir = Path(output).expanduser() if output else Path(os.getenv("AKF_OUTPUT_DIR", "."))
         self.telemetry_path = Path(telemetry_path).expanduser() if telemetry_path else Path(os.getenv("AKF_TELEMETRY_PATH", "telemetry/events.jsonl"))
         self._system_prompt = None
+        # Provider cache: reuse the same SDK client across calls for the same model.
+        # Prevents accumulation of open HTTP connections that can cause hangs on
+        # providers with per-key connection limits (e.g. Groq).
+        self._provider_cache: dict = {}
 
     def _log(self, msg):
         if self.verbose:
@@ -113,7 +117,10 @@ class Pipeline:
         from akf.validator import validate
         from akf.validation_error import Severity
         try:
-            provider = get_provider(model or self.model)
+            effective_model = model or self.model
+            if effective_model not in self._provider_cache:
+                self._provider_cache[effective_model] = get_provider(effective_model)
+            provider = self._provider_cache[effective_model]
         except Exception as e:
             return GenerateResult(success=False, content="", errors=[str(e)])
         system_prompt = self._load_system_prompt()
