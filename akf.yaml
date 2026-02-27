@@ -1,0 +1,43 @@
+schema_version: "1.0.0"
+
+# AKF repo configuration — AKF documents itself.
+# This file governs the docs/ directory: specs, ADRs, guides, checklists.
+# See: https://github.com/petrnzrnk-creator/ai-knowledge-filler
+
+vault_path: "./docs"
+
+taxonomy:
+  domains:
+    # AKF core system — architecture, pipeline, ADRs
+    - akf-core
+
+    # Public documentation — guides, CLI reference, quickstart
+    - akf-docs
+
+    # Operations — release checklists, review gates, CI/CD
+    - akf-ops
+
+    # Specifications — metadata standard, domain taxonomy, schemas
+    - akf-spec
+
+enums:
+  type:
+    - concept
+    - guide
+    - reference
+    - checklist
+    - project
+    - roadmap
+    - template
+    - audit
+
+  level:
+    - beginner
+    - intermediate
+    - advanced
+
+  status:
+    - draft
+    - active
+    - completed
+    - archived
