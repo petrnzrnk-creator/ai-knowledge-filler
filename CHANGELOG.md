@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to AKF are documented here.
+## [0.5.3] — 2026-02-27
+
+### Chores
+
+- Add telemetry/ to .gitignore ([`2d8bb92`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/2d8bb92c9a1358f50d8afb1c2ccb0c50598a91bd))
+- Remove root system_prompt.md — canonical in akf/ ([`6d85260`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/6d852604a0ebe8d2611c5166e25a2cb2778d7eec))
+
+### Documentation
+
+- Update CHANGELOG for v0.5.2 ([`06e56b2`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/06e56b22a916c322cbc6e80d71c947b2f2f12bd0))
+- Migrate ARCHITECTURE, CONTRIBUTING, ADR-001 to public docs with frontmatter (v0.5.2) ([`0a47ae2`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/0a47ae2fb2e1aec8041ed9b441bf1db133bc31aa))
+- Fix WikiLinks → relative paths in cli-reference and user-guide ([`d9f0833`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/d9f0833ddba4602ba689e9f24cde20450a161a09))
+
+### Features
+
+- Add akf generate --batch for JSON plan-driven bulk generation (v0.5.3) ([`c9f1602`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/c9f1602f5438a05d9085210703601c0daf5e8bb5))
+
 ## [0.5.2] — 2026-02-27
 
 ### Bug Fixes
