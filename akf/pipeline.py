@@ -105,7 +105,7 @@ class Pipeline:
             fp = out_dir / f"{fp.stem}_{ts}.md"
         return fp
 
-    def generate(self, prompt, output=None, model=None):
+    def generate(self, prompt, output=None, model=None, hints=None):
         from llm_providers import get_provider
         from akf.telemetry import TelemetryWriter, new_generation_id
         from akf.retry_controller import run_retry_loop
@@ -117,6 +117,14 @@ class Pipeline:
         except Exception as e:
             return GenerateResult(success=False, content="", errors=[str(e)])
         system_prompt = self._load_system_prompt()
+        if hints:
+            context_lines = []
+            if hints.get("domain"):
+                context_lines.append(f"domain: {hints['domain']}")
+            if hints.get("type"):
+                context_lines.append(f"type: {hints['type']}")
+            if context_lines:
+                system_prompt += "\n\nContext for this generation:\n" + "\n".join(context_lines)
         self._log(f"Generating via {provider.display_name}...")
         generation_id = new_generation_id()
         writer = TelemetryWriter(path=self.telemetry_path)
@@ -193,10 +201,23 @@ class Pipeline:
         return ValidateResult(valid=len(errors) == 0, errors=errors, warnings=warnings, filepath=fp)
 
     def batch_generate(self, prompts, output=None, model=None):
+        """Generate multiple documents sequentially.
+
+        prompts: list of str or list of dict with keys:
+            - prompt (required): the generation prompt
+            - domain (optional): injected into system prompt context
+            - type (optional): injected into system prompt context
+        """
         results = []
-        for i, prompt in enumerate(prompts, 1):
-            self._log(f"[{i}/{len(prompts)}] {prompt[:60]}...")
-            results.append(self.generate(prompt, output=output, model=model))
+        for i, item in enumerate(prompts, 1):
+            if isinstance(item, dict):
+                prompt_text = item.get("prompt", "")
+                hints = {k: v for k, v in item.items() if k != "prompt"} or None
+            else:
+                prompt_text = item
+                hints = None
+            self._log(f"[{i}/{len(prompts)}] {prompt_text[:60]}...")
+            results.append(self.generate(prompt_text, output=output, model=model, hints=hints))
         return results
 
     def enrich(
