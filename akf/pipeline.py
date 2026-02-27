@@ -42,6 +42,22 @@ def _inject_schema_version(content: str, version: str = "1.0.0") -> str:
         flags=re.MULTILINE,
     )
 
+
+
+@dataclass
+class EnrichResult:
+    """Result of enriching a single Markdown file."""
+    success: bool
+    path: Path
+    status: str          # "enriched" | "skipped" | "failed" | "warning"
+    skip_reason: str = ""
+    attempts: int = 0
+    existing_fields: list[str] = field(default_factory=list)
+    generated_fields: list[str] = field(default_factory=list)
+    generation_id: str = ""
+    errors: list = field(default_factory=list)
+
+
 class Pipeline:
     def __init__(self, output=None, model="auto", telemetry_path=None, verbose=True):
         self.model = model
@@ -182,3 +198,184 @@ class Pipeline:
             self._log(f"[{i}/{len(prompts)}] {prompt[:60]}...")
             results.append(self.generate(prompt, output=output, model=model))
         return results
+
+    def enrich(
+        self,
+        path: "str | Path",
+        force: bool = False,
+        dry_run: bool = False,
+        output: "str | Path | None" = None,
+        model: "str | None" = None,
+    ) -> "EnrichResult":
+        """Enrich a single Markdown file with YAML frontmatter."""
+        import re as _re
+        import warnings
+        import yaml
+        from datetime import date
+        from llm_providers import get_provider
+        from akf.validator import validate
+        from akf.retry_controller import run_retry_loop
+        from akf.config import get_config
+        from akf.telemetry import EnrichEvent, new_generation_id
+        from akf.enricher import (
+            REQUIRED_FIELDS, build_prompt, derive_title,
+            extract_missing_fields, merge_yaml, read_file,
+            write_back, _assemble,
+        )
+
+        file_path = Path(path)
+        today = date.today().isoformat()
+        generation_id = new_generation_id()
+
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            existing, body = read_file(file_path)
+
+        existing_field_names = list(existing.keys())
+
+        if not body.strip() and not existing:
+            return EnrichResult(
+                success=True, path=file_path, status="warning",
+                skip_reason="empty_file", generation_id=generation_id,
+            )
+
+        if file_path.suffix.lower() != ".md":
+            return EnrichResult(
+                success=True, path=file_path, status="skipped",
+                skip_reason="non_markdown", generation_id=generation_id,
+            )
+
+        if "title" not in existing or not existing.get("title"):
+            existing["title"] = derive_title(file_path)
+
+        missing = extract_missing_fields(existing, REQUIRED_FIELDS)
+
+        if not missing and not force:
+            if not dry_run and self.writer is not None:
+                self.writer.write(EnrichEvent(
+                    generation_id=generation_id, file=str(file_path),
+                    schema_version="1.0.0", existing_fields=existing_field_names,
+                    generated_fields=[], attempts=0, converged=True,
+                    skipped=True, skip_reason="valid_frontmatter",
+                    model=model or self.model_name, temperature=0.0,
+                ))
+            return EnrichResult(
+                success=True, path=file_path, status="skipped",
+                skip_reason="valid_frontmatter", existing_fields=existing_field_names,
+                generation_id=generation_id,
+            )
+
+        cfg = get_config()
+        prompt = build_prompt(
+            body=body,
+            existing=existing,
+            missing=missing if not force else REQUIRED_FIELDS,
+            taxonomy_domains=cfg.domains,
+            today=today,
+        )
+        provider = get_provider(model or self.model_name)
+        raw_generated = provider.generate(prompt, "")
+
+        try:
+            generated = yaml.safe_load(raw_generated) or {}
+            if not isinstance(generated, dict):
+                generated = {}
+        except Exception:
+            generated = {}
+
+        merged = merge_yaml(existing, generated, force=force, today=today)
+        document = _assemble(merged, body)
+
+        try:
+            initial_errors = validate(document)
+        except Exception:
+            initial_errors = []
+
+        blocking = [e for e in initial_errors if e.severity.value == "error"]
+        total_attempts = 1
+        converged = not blocking
+
+        if blocking:
+            def _gen_fn(doc: str, retry_prompt: str) -> str:
+                return provider.generate(retry_prompt, "")
+
+            def _val_fn(doc: str) -> list:
+                try:
+                    return validate(doc)
+                except Exception:
+                    return []
+
+            retry_result = run_retry_loop(
+                document=document, errors=blocking,
+                generate_fn=_gen_fn, validate_fn=_val_fn,
+                generation_id=generation_id, document_id=file_path.stem,
+                schema_version="1.0.0", model=provider.model_name,
+                temperature=0, top_p=1, writer=self.writer,
+            )
+            document = retry_result.document
+            total_attempts = retry_result.attempts
+            converged = retry_result.converged
+            blocking = [e for e in retry_result.errors if e.severity.value == "error"]
+
+        yaml_match = _re.match(r"^---\n(.*?)---\n", document, _re.DOTALL)
+        if yaml_match:
+            try:
+                final_merged = yaml.safe_load(yaml_match.group(1)) or merged
+            except Exception:
+                final_merged = merged
+        else:
+            final_merged = merged
+
+        generated_field_names = [k for k in final_merged if k not in existing_field_names]
+
+        if dry_run:
+            print("---")
+            print(yaml.dump(final_merged, default_flow_style=False, allow_unicode=True), end="")
+            print("---")
+            return EnrichResult(
+                success=not blocking, path=file_path,
+                status="enriched" if not blocking else "failed",
+                attempts=total_attempts, existing_fields=existing_field_names,
+                generated_fields=generated_field_names,
+                generation_id=generation_id, errors=blocking,
+            )
+
+        write_target = (Path(output) / file_path.name) if output else file_path
+        if output:
+            Path(output).mkdir(parents=True, exist_ok=True)
+
+        status = "failed"
+        if converged or not blocking:
+            write_back(write_target, final_merged, body)
+            status = "enriched"
+
+        if not dry_run and self.writer is not None:
+            self.writer.write(EnrichEvent(
+                generation_id=generation_id, file=str(file_path),
+                schema_version="1.0.0", existing_fields=existing_field_names,
+                generated_fields=generated_field_names, attempts=total_attempts,
+                converged=converged, skipped=False, skip_reason="",
+                model=provider.model_name, temperature=0.0,
+            ))
+
+        return EnrichResult(
+            success=(status == "enriched"), path=file_path, status=status,
+            attempts=total_attempts, existing_fields=existing_field_names,
+            generated_fields=generated_field_names,
+            generation_id=generation_id, errors=blocking,
+        )
+
+    def enrich_dir(
+        self,
+        path: "str | Path",
+        force: bool = False,
+        dry_run: bool = False,
+        output: "str | Path | None" = None,
+        model: "str | None" = None,
+    ) -> "list[EnrichResult]":
+        """Enrich all .md files in directory recursively."""
+        return [
+            self.enrich(path=f, force=force, dry_run=dry_run, output=output, model=model)
+            for f in sorted(Path(path).rglob("*.md"))
+        ]
+
