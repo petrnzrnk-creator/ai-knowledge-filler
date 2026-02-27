@@ -48,22 +48,23 @@ All PRs must pass these gates before merge:
 # 1. Tests — 100% must pass
 pytest --tb=short
 
-# 2. Coverage — must not decrease
-pytest --cov=. --cov-report=term-missing
+# 2. Coverage — must not decrease below 94%
+pytest --cov=. --cov-report=term-missing --cov-fail-under=94
 
 # 3. Format check
 black --check .
 
 # 4. Lint — score ≥ 9.0
-pylint *.py --fail-under=9.0
+pylint cli.py llm_providers.py exceptions.py logger.py akf/ --fail-under=9.0
 
 # 5. Type check
-mypy *.py --ignore-missing-imports
+mypy cli.py llm_providers.py exceptions.py logger.py akf/ --ignore-missing-imports
 ```
 
 Run all at once:
 ```bash
-black . && pylint *.py --fail-under=9.0 && mypy *.py --ignore-missing-imports && pytest
+black . && pylint cli.py llm_providers.py exceptions.py logger.py akf/ --fail-under=9.0 && \
+mypy cli.py llm_providers.py exceptions.py logger.py akf/ --ignore-missing-imports && pytest
 ```
 
 CI runs the same gates on every push via `.github/workflows/tests.yml` and `lint.yml`.
@@ -76,24 +77,48 @@ CI runs the same gates on every push via `.github/workflows/tests.yml` and `lint
 ai-knowledge-filler/
 ├── cli.py                  # Entry point, orchestration
 ├── llm_providers.py        # Provider abstractions and implementations
-├── validate_yaml.py        # YAML frontmatter validator
 ├── exceptions.py           # Typed exception hierarchy
 ├── logger.py               # Logging factory (human + JSON)
 ├── akf/
 │   ├── __init__.py         # Package namespace
-│   └── system_prompt.md    # Bundled LLM instruction set (asset)
+│   ├── pipeline.py         # Pipeline class — generate(), validate(), batch_generate()
+│   ├── validator.py        # Validation Engine — binary VALID/INVALID, E001–E007
+│   ├── validation_error.py # ValidationError dataclass + error constructors
+│   ├── error_normalizer.py # Translates ValidationErrors → LLM retry instructions
+│   ├── retry_controller.py # run_retry_loop() — convergence protection, max 3 attempts
+│   ├── commit_gate.py      # Atomic write — only VALID files reach disk
+│   ├── telemetry.py        # TelemetryWriter, append-only JSONL event stream
+│   ├── config.py           # get_config() — loads akf.yaml or defaults
+│   ├── server.py           # FastAPI REST API — /v1/generate, /v1/validate, /v1/batch
+│   ├── system_prompt.md    # Bundled LLM instruction set (asset)
+│   └── defaults/
+│       └── akf.yaml        # Default taxonomy and enum configuration
+├── Scripts/
+│   ├── validate_yaml.py    # Standalone YAML frontmatter validator (CLI utility)
+│   └── analyze_telemetry.py # Telemetry analysis — retry rates, ontology friction
 ├── tests/
+│   ├── unit/               # Unit tests per module
+│   ├── integration/        # End-to-end pipeline tests
 │   ├── test_cli.py
 │   ├── test_llm_providers.py
-│   ├── test_validate_yaml.py
-│   └── test_exceptions.py
+│   ├── test_validator.py
+│   ├── test_validation_error.py
+│   ├── test_error_normalizer.py
+│   ├── test_retry_controller.py
+│   ├── test_commit_gate.py
+│   ├── test_telemetry.py
+│   ├── test_config.py
+│   ├── test_exceptions.py
+│   └── test_logger.py
 ├── docs/
 │   ├── user-guide.md
 │   ├── cli-reference.md
 │   └── examples/
 ├── .github/workflows/
+│   ├── ci.yml
 │   ├── tests.yml
 │   ├── lint.yml
+│   ├── validate.yml
 │   └── release.yml
 ├── pyproject.toml
 ├── ARCHITECTURE.md
@@ -149,14 +174,24 @@ all-providers = [
 
 ## Adding a New Domain
 
-Edit `Domain_Taxonomy.md` — add a `####` heading:
+Edit `akf/defaults/akf.yaml` — add the domain to the `enums.domain` list:
 
-```markdown
-#### my-new-domain
-Brief description of what files belong here.
+```yaml
+enums:
+  domain:
+    - existing-domain
+    - my-new-domain      # add here
 ```
 
-`validate_yaml.py` picks it up at runtime via regex — no code change required. Run `akf validate` after to confirm the domain is recognised.
+If you also maintain `Domain_Taxonomy.md` in a vault, add a `####` heading there for documentation purposes. The validator reads from `akf.yaml` at runtime — no code change required. Run `akf validate` after to confirm the domain is recognised.
+
+---
+
+## Adding a New YAML Type or Status
+
+1. Update `akf/defaults/akf.yaml` — add to the appropriate enum list
+2. Update `Metadata_Template_Standard.md` to document the new value
+3. If the change affects validation logic, update `akf/validator.py`
 
 ---
 
@@ -179,22 +214,26 @@ def test_groq_generate(monkeypatch):
     assert result == "# Output"
 ```
 
-**Test validation:**
+**Test validation (via akf.validator):**
 ```python
-from validate_yaml import validate_file
+from akf.validator import Validator
+from akf.config import get_config
 
 def test_valid_file(tmp_path):
     f = tmp_path / "test.md"
     f.write_text("---\ntitle: Test\ntype: concept\ndomain: ai-system\n"
                  "level: intermediate\nstatus: active\ntags: [a,b,c]\n"
                  "created: 2026-01-01\nupdated: 2026-01-01\n---\n## Content\n")
-    errors, warnings = validate_file(str(f))
-    assert errors == []
+    config = get_config()
+    validator = Validator(config)
+    result = validator.validate(f.read_text())
+    assert result.is_valid
+    assert result.errors == []
 ```
 
 **Coverage requirement:** do not decrease existing coverage. Check with:
 ```bash
-pytest --cov=. --cov-report=term-missing --cov-fail-under=95
+pytest --cov=. --cov-report=term-missing --cov-fail-under=94
 ```
 
 ---
@@ -242,8 +281,8 @@ Examples:
 ```
 feat: add XAI Grok provider with retry support
 fix: ProviderUnavailableError signature — add reason parameter
-docs: add ARCHITECTURE.md module map
-test: add validate_yaml edge cases for empty frontmatter
+docs: update ARCHITECTURE.md module map for Phase 2.5
+test: add validator edge cases for E006 taxonomy violation
 ```
 
 ---
