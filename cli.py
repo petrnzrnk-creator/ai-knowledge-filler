@@ -174,19 +174,21 @@ def cmd_init(args: argparse.Namespace) -> None:
 
 
 def load_system_prompt() -> str:
-    # Installed package: look in akf/ subdirectory
+    """Load system prompt exclusively from installed package.
+
+    Raises a clear error if not found — no CWD fallback to avoid
+    accidentally picking up repo's system_prompt.md when running
+    from the repo directory.
+    """
     try:
         import akf
         pkg_path = Path(akf.__file__).parent / "system_prompt.md"
         if pkg_path.exists():
             return pkg_path.read_text(encoding="utf-8")
-    except Exception:
-        pass
-    # Local dev: look next to cli.py
-    if not SYSTEM_PROMPT_PATH.exists():
-        err(f"System prompt not found at: {SYSTEM_PROMPT_PATH}")
-        sys.exit(1)
-    return SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        err(f"system_prompt.md not found in installed package: {pkg_path}")
+    except ImportError:
+        err("akf package not found. Install with: pip install ai-knowledge-filler")
+    sys.exit(1)
 
 
 def extract_filename(content: str, prompt: str) -> str:
