@@ -1,23 +1,21 @@
 ---
 title: "AKF CLI Reference"
 type: reference
-domain: ai-system
+domain: akf-docs
 level: intermediate
 status: active
-version: v1.0
-tags: [cli, reference, commands, akf, llm, validate, generate]
+version: v2.0
+tags: [cli, reference, commands, akf, enrich, validate, generate]
 related:
   - "[[docs/user-guide]]"
-  - "[[07-REFERENCE/AKF_System_Docs/System_Prompt_AI_Knowledge_Filler]]"
-  - "[[07-REFERENCE/Domain_Taxonomy]]"
 created: 2026-02-19
-updated: 2026-02-19
+updated: 2026-02-27
 ---
 
 ## Purpose
 
-Complete reference for all `akf` CLI commands, flags, environment variables, and exit codes.  
-Generated from `cli.py` + `llm_providers.py` — reflects actual behaviour.
+Complete reference for all `akf` CLI commands, flags, environment variables, and exit codes.
+Reflects actual behaviour as of v0.5.0.
 
 ---
 
@@ -27,71 +25,96 @@ Generated from `cli.py` + `llm_providers.py` — reflects actual behaviour.
 akf <command> [options]
 
 Commands:
-  generate    Generate a structured Markdown knowledge file
+  generate    Generate a structured Markdown knowledge file from a prompt
+  enrich      Add YAML frontmatter to existing Markdown files
   validate    Validate YAML frontmatter in Markdown files
+  init        Create akf.yaml config in target directory
   models      List available LLM providers and their status
+  serve       Start REST API server
 ```
 
 ---
 
 ## `akf generate`
 
-Generate a knowledge file from a natural language prompt using an LLM provider.
+Generate a knowledge file from a natural language prompt.
 
 **Usage:**
 ```bash
 akf generate PROMPT [--model MODEL] [--output PATH]
 ```
 
-**Arguments:**
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `PROMPT` | ✅ Yes | Natural language description of the file to generate |
-
 **Options:**
 
-| Flag | Short | Default | Values | Description |
-|------|-------|---------|--------|-------------|
-| `--model` | `-m` | `auto` | `auto` `claude` `gemini` `gpt4` `groq` `grok` `ollama` | LLM provider to use |
-| `--output` | `-o` | see below | any path | Custom output directory |
-
-**Default output path:**
-```
-/storage/emulated/0/Download/WorkingprogressAKF_Vault/04-DELIVERABLES/Code/
-```
-Override with `--output` to write anywhere.
-
-**Filename resolution:**
-Filename is extracted from the `title:` field in the generated YAML frontmatter.  
-Format: `Title_Words.md` (spaces and hyphens → underscores, special chars stripped).  
-If title extraction fails: first 4 words of the prompt, lowercased.  
-If file already exists: timestamp suffix appended (`Name_143022.md`).
-
-**Auto-validation:**
-After saving, `akf validate` runs automatically on the output file.  
-Result printed to stdout. Does not block save on failure — warnings only.
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--model` | `-m` | `auto` | LLM provider: `auto` `claude` `gemini` `gpt4` `groq` `grok` `ollama` |
+| `--output` | `-o` | `AKF_OUTPUT_DIR` or `.` | Output directory |
 
 **Examples:**
 ```bash
-# Auto-select provider (fastest available)
-akf generate "Create a concept file about API Rate Limiting for the api-design domain"
-
-# Specify provider
-akf generate -m claude "Create a guide for Docker multi-stage builds"
-
-# Custom output directory
-akf generate -o /tmp/drafts "Create a security checklist for Python production deployments"
-
-# Groq (fastest, free tier)
-akf generate -m groq "Create a reference file for Git branching strategies"
+akf generate "Create a concept file about API rate limiting"
+akf generate -m groq "Create a guide for Docker multi-stage builds"
+akf generate -m claude -o ./docs "Create a security checklist"
 ```
+
+---
+
+## `akf enrich`
+
+Add YAML frontmatter to existing Markdown files that have missing or incomplete metadata.
+
+**Usage:**
+```bash
+akf enrich PATH [--dry-run] [--force] [--model MODEL] [--output DIR]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `PATH` | File or directory to enrich |
+
+**Options:**
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--dry-run` | — | `False` | Print generated YAML, no file writes |
+| `--force` | `-f` | `False` | Overwrite valid existing frontmatter |
+| `--model` | `-m` | `auto` | LLM provider |
+| `--output` | `-o` | — | Copy enriched files here (no overwrite of originals) |
+
+**Behavior by file state:**
+
+| State | Default | `--force` |
+|-------|---------|-----------|
+| No frontmatter | Generate + validate + write | Same |
+| Incomplete frontmatter | Generate missing fields only | Regenerate all |
+| Valid frontmatter | Skip | Regenerate all |
+| Empty file | Skip with warning | Skip |
+
+**Examples:**
+```bash
+akf enrich docs/
+akf enrich docs/ --dry-run
+akf enrich docs/old-notes/ --force --model groq
+akf enrich vault/ --output vault-enriched/
+```
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | All enriched or skipped (valid) |
+| `1` | One or more files failed after max retries |
+| `2` | No `.md` files found |
+| `3` | Config error |
 
 ---
 
 ## `akf validate`
 
-Validate YAML frontmatter in one file, a directory, or current working directory.
+Validate YAML frontmatter against schema and taxonomy defined in `akf.yaml`.
 
 **Usage:**
 ```bash
@@ -100,82 +123,115 @@ akf validate [--file FILE] [--path PATH] [--strict]
 
 **Options:**
 
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--file` | `-f` | — | Validate a single Markdown file |
-| `--path` | `-p` | — | Validate all `.md` files recursively in folder |
-| `--strict` | `-s` | `False` | Promote warnings to errors (stricter gate) |
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--file` | `-f` | Validate a single file |
+| `--path` | `-p` | Validate all `.md` files recursively |
+| `--strict` | `-s` | Promote warnings to errors |
 
-If neither `--file` nor `--path` is provided, validates all `**/*.md` in the current directory recursively.
+If no flags provided: validates all `**/*.md` in current directory.
 
-**Exclusions (always skipped):**
-- Files in `.github/` directories
-- `README.md` files
+**Error codes:**
 
-**Output format:**
-```
-✅ path/to/file.md          — valid
-⚠  path/to/file.md          — warnings (shown below)
-❌ path/to/file.md          — errors (shown below)
-
-→  Total: N | OK: N | Warnings: N | Errors: N
-```
+| Code | Field | Meaning |
+|------|-------|---------|
+| E001 | type/level/status | Invalid enum value |
+| E002 | any | Required field missing |
+| E003 | created/updated | Date not ISO 8601 |
+| E004 | title/tags | Type mismatch |
+| E005 | frontmatter | General schema violation |
+| E006 | domain | Not in taxonomy |
+| E007 | created/updated | `created` > `updated` |
 
 **Exit codes:**
 
 | Code | Meaning |
 |------|---------|
-| `0` | All files valid (errors = 0) |
-| `1` | One or more files have errors |
+| `0` | All files valid |
+| `1` | One or more errors found |
 
 **Examples:**
 ```bash
-# Single file
-akf validate -f 02-ACTIVE-PHASE/Tasks/Task_Type_Hints.md
+akf validate -f docs/cli-reference.md
+akf validate -p docs/
+akf validate -p docs/ --strict
+```
 
-# Entire folder
-akf validate -p 02-ACTIVE-PHASE/Tasks/
+---
 
-# Strict mode (warnings become errors)
-akf validate -p 07-REFERENCE/ --strict
+## `akf init`
 
-# Current directory (recursive)
-akf validate
+Generate `akf.yaml` config file in target directory.
+
+**Usage:**
+```bash
+akf init [--path DIR] [--force]
+```
+
+**Options:**
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--path` | `-p` | Target directory (default: CWD) |
+| `--force` | `-f` | Overwrite existing `akf.yaml` |
+
+**Example:**
+```bash
+akf init
+akf init --path ./my-vault
 ```
 
 ---
 
 ## `akf models`
 
-List all LLM providers, their availability status, and active model names.
+List all LLM providers, availability status, and active model names.
 
 **Usage:**
 ```bash
 akf models
 ```
 
-**No options.** Output example:
+**Output example:**
 ```
-→  Available LLM providers:
-
 ✅ groq       Groq (Llama 3.3)
    Model: llama-3.3-70b-versatile
-
-❌ grok       Grok (xAI)
-   Set XAI_API_KEY
 
 ✅ claude     Claude (Anthropic)
    Model: claude-sonnet-4-20250514
 
 ❌ gemini     Gemini (Google)
    Set GOOGLE_API_KEY
-
-❌ gpt4       GPT-3.5 (OpenAI)
-   Set OPENAI_API_KEY
-
-❌ ollama     Ollama (llama3.2:3b)
-   Run Ollama server
 ```
+
+---
+
+## `akf serve`
+
+Start AKF REST API server.
+
+**Usage:**
+```bash
+akf serve [--host HOST] [--port PORT]
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host` | `0.0.0.0` | Bind address |
+| `--port` | `8000` | Port |
+
+**Endpoints:**
+
+| Method | Path | Rate limit | Description |
+|--------|------|-----------|-------------|
+| `GET` | `/health` | — | Health check |
+| `POST` | `/v1/generate` | 10/min | Generate file |
+| `POST` | `/v1/enrich` | 10/min | Enrich file |
+| `POST` | `/v1/validate` | 30/min | Validate content |
+| `POST` | `/v1/batch` | 3/min | Batch generate |
+| `GET` | `/v1/models` | — | List providers |
 
 ---
 
@@ -183,103 +239,32 @@ akf models
 
 ### API Keys
 
-| Variable | Provider | Required for |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Claude (Anthropic) | `akf generate -m claude` |
-| `GOOGLE_API_KEY` | Gemini (Google) | `akf generate -m gemini` |
-| `OPENAI_API_KEY` | GPT-3.5 (OpenAI) | `akf generate -m gpt4` |
-| `GROQ_API_KEY` | Groq (Llama 3.3) | `akf generate -m groq` |
-| `XAI_API_KEY` | Grok (xAI) | `akf generate -m grok` |
+| Variable | Provider |
+|----------|----------|
+| `ANTHROPIC_API_KEY` | Claude |
+| `GOOGLE_API_KEY` | Gemini |
+| `OPENAI_API_KEY` | GPT-4 / Grok |
+| `GROQ_API_KEY` | Groq |
+| `XAI_API_KEY` | Grok (xAI) |
 
-### Ollama Configuration
+### Runtime
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OLLAMA_MODEL` | `llama3.2:3b` | Model name to use with Ollama |
-| `OLLAMA_BASE_URL` | `http://0.0.0.0:8080` | Ollama server address |
+| `AKF_OUTPUT_DIR` | `.` | Default output directory |
+| `AKF_TELEMETRY_PATH` | `telemetry/events.jsonl` | Telemetry log path |
+| `AKF_CONFIG_PATH` | — | Explicit path to `akf.yaml` |
+| `AKF_API_KEY` | — | REST API auth key (optional) |
+| `AKF_CORS_ORIGINS` | `*` | Allowed CORS origins |
 
-### Setting Keys (Termux / bash)
-
-```bash
-# Temporary (current session)
-export ANTHROPIC_API_KEY="sk-ant-..."
-export GROQ_API_KEY="gsk_..."
-
-# Permanent (add to ~/.bashrc or ~/.zshrc)
-echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.bashrc
-source ~/.bashrc
-```
-
----
-
-## Provider Reference
-
-### Auto-select Priority
-
-When `--model auto` (default), providers are tried in this order — first available wins:
+### Provider Priority (auto mode)
 
 ```
 groq → grok → claude → gemini → gpt4 → ollama
 ```
 
-Groq is first because it's the fastest and has a free tier.
-
-### Provider Details
-
-| Key | Display Name | Model | Env Var | Install |
-|-----|-------------|-------|---------|---------|
-| `claude` | Claude (Anthropic) | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` | `pip install anthropic` |
-| `gemini` | Gemini (Google) | `gemini-3-flash-preview` | `GOOGLE_API_KEY` | `pip install google-genai` |
-| `gpt4` | GPT-3.5 (OpenAI) | `gpt-3.5-turbo` | `OPENAI_API_KEY` | `pip install openai` |
-| `groq` | Groq (Llama 3.3) | `llama-3.3-70b-versatile` | `GROQ_API_KEY` | `pip install groq` |
-| `grok` | Grok (xAI) | `grok-beta` | `XAI_API_KEY` | `pip install openai` |
-| `ollama` | Ollama (local) | `llama3.2:3b` (default) | none | run Ollama server |
-
-### Optional Provider Installs
-
-Core install (`pip install ai-knowledge-filler`) includes only `anthropic`, `pyyaml`, `click`.  
-Install extras as needed:
-
-```bash
-# All cloud providers
-pip install ai-knowledge-filler[all-providers]
-
-# Individual
-pip install groq
-pip install google-genai
-pip install openai    # covers gpt4 + grok
-```
-
 ---
 
-## Retry Behaviour
+## Conclusion
 
-On transient errors (timeout, rate limit, 429, 502, 503), `akf generate` retries automatically:
-
-```
-Attempt 1 → wait 1s → Attempt 2 → wait 2s → Attempt 3 → fail
-```
-
-Non-retryable errors (401, 403, invalid API key) fail immediately.
-
----
-
-## Exit Codes
-
-| Code | Command | Meaning |
-|------|---------|---------|
-| `0` | all | Success |
-| `1` | `validate` | One or more validation errors found |
-| `1` | `generate` | Provider unavailable, generation error, or missing system prompt |
-
----
-
-## Common Error Messages
-
-| Message | Cause | Fix |
-|---------|-------|-----|
-| `No LLM providers available` | No API keys set | `export GROQ_API_KEY=...` (fastest option) |
-| `System prompt not found at: ...` | Package install incomplete | `pip install --force-reinstall ai-knowledge-filler` |
-| `❌ Check API key and dependencies` | Key missing or wrong | Run `akf models` to diagnose |
-| `Generation error: 401` | Invalid API key | Verify key at provider dashboard |
-| `Validation found N issues` | Generated file has YAML errors | Check output file; re-run with different prompt if needed |
+Full pipeline: `akf init` → `akf enrich` (existing files) → `akf generate` (new files) → `akf validate` → commit.
