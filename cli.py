@@ -173,6 +173,71 @@ def cmd_init(args: argparse.Namespace) -> None:
 # ─── GENERATE ─────────────────────────────────────────────────────────────────
 
 
+def _cmd_generate_batch(args: argparse.Namespace) -> None:
+    """Execute batch generation from a JSON plan file.
+
+    Each plan item may have: prompt (required), domain, type.
+    Exits 0 if all succeed, 1 if any fail.
+    """
+    import json
+    from akf.pipeline import Pipeline
+
+    batch_path = Path(args.batch)
+    if not batch_path.exists():
+        err(f"Batch file not found: {batch_path}")
+        sys.exit(1)
+
+    try:
+        raw = batch_path.read_text(encoding="utf-8")
+        plan = json.loads(raw)
+    except (json.JSONDecodeError, ValueError) as e:
+        err(f"Invalid JSON in batch file: {e}")
+        sys.exit(1)
+
+    if not isinstance(plan, list):
+        err("Batch file must contain a JSON array.")
+        sys.exit(1)
+
+    if len(plan) == 0:
+        info("Batch plan is empty — nothing to generate.")
+        print()
+        info("Total: 0 | OK: 0 | Failed: 0")
+        sys.exit(0)
+
+    out_dir = Path(args.output) if getattr(args, "output", None) else OUTPUT_DIR
+    model = getattr(args, "model", "auto") or "auto"
+
+    pipeline = Pipeline(
+        output=str(out_dir),
+        model=model,
+        telemetry_path=TELEMETRY_PATH,
+        verbose=False,
+    )
+
+    info(f"Running batch of {len(plan)} item(s) via {model}...")
+    print()
+
+    results = pipeline.batch_generate(plan, output=str(out_dir), model=model)
+
+    ok_count = 0
+    fail_count = 0
+    for item, result in zip(plan, results):
+        prompt_text = item.get("prompt", str(item)) if isinstance(item, dict) else str(item)
+        filename = Path(result.path).name if result.path else prompt_text[:40]
+        attempts = result.attempts or 1
+        attempt_label = f"{attempts} attempt{'s' if attempts != 1 else ''}"
+        if result.success:
+            ok_count += 1
+            print(f"{GREEN}→ {filename} ✅ ({attempt_label}){NC}")
+        else:
+            fail_count += 1
+            print(f"{RED}→ {filename} ❌ ({attempt_label}, failed){NC}")
+
+    print()
+    info(f"Total: {len(plan)} | OK: {ok_count} | Failed: {fail_count}")
+    sys.exit(0 if fail_count == 0 else 1)
+
+
 def load_system_prompt() -> str:
     """Load system prompt exclusively from installed package.
 
@@ -219,6 +284,15 @@ def cmd_generate(args: argparse.Namespace) -> None:
       3. commit() → atomic write
       4. Telemetry emitted by RetryController + CommitGate automatically
     """
+    # ── Batch mode ────────────────────────────────────────────────────────────
+    if getattr(args, "batch", None):
+        _cmd_generate_batch(args)
+        return
+
+    if not args.prompt:
+        err("prompt is required (or use --batch <plan.json>)")
+        sys.exit(1)
+
     from akf.telemetry import TelemetryWriter, new_generation_id
     from akf.retry_controller import run_retry_loop
     from akf.commit_gate import commit as akf_commit
@@ -485,7 +559,11 @@ def main() -> int:
 
     # Generate command
     gen = sub.add_parser("generate", help="Generate knowledge file")
-    gen.add_argument("prompt")
+    gen.add_argument("prompt", nargs="?", default=None,
+                     help="Generation prompt (omit when using --batch)")
+    gen.add_argument("--batch", "-b",
+                     metavar="PLAN_JSON",
+                     help="JSON file with batch plan (array of {prompt, domain, type})")
     gen.add_argument("--model", "-m",
                      choices=["auto", "claude", "gemini", "gpt4", "groq", "grok", "ollama"],
                      default="auto",
