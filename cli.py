@@ -350,6 +350,93 @@ def cmd_generate(args: argparse.Namespace) -> None:
         warn(f"Validation found {len(commit_result.blocking_errors)} issues.")
 
 
+# ─── ENRICH ──────────────────────────────────────────────────────────────────
+
+
+def cmd_enrich(args: argparse.Namespace) -> None:
+    """Add YAML frontmatter to existing Markdown files via the AKF pipeline."""
+    from akf.pipeline import Pipeline, EnrichResult
+
+    target = Path(args.path)
+    if not target.exists():
+        err(f"Path not found: {target}")
+        sys.exit(3)
+
+    dry_run: bool = getattr(args, "dry_run", False)
+    force: bool = getattr(args, "force", False)
+    model: str = getattr(args, "model", "auto")
+    output: str | None = getattr(args, "output", None)
+
+    pipeline = Pipeline(
+        model=model,
+        telemetry_path=TELEMETRY_PATH if not dry_run else None,
+        verbose=False,
+    )
+
+    if target.is_file():
+        md_files = [target]
+    elif target.is_dir():
+        exclude = CLI_EXCLUDE_PATTERNS + ["10-OVERHEAD"]
+        md_files = sorted(
+            f for f in target.rglob("*.md")
+            if not any(x in str(f) for x in exclude)
+        )
+    else:
+        err(f"Not a file or directory: {target}")
+        sys.exit(3)
+
+    if not md_files:
+        warn("No .md files found.")
+        sys.exit(2)
+
+    if dry_run:
+        info("DRY RUN — no files will be modified")
+    info(f"Enriching {len(md_files)} file(s)...")
+    print()
+
+    results: list[EnrichResult] = []
+    for md_file in md_files:
+        try:
+            result = pipeline.enrich(
+                path=md_file,
+                force=force,
+                dry_run=dry_run,
+                output=output,
+                model=model,
+            )
+        except Exception as exc:
+            from akf.pipeline import EnrichResult
+            result = EnrichResult(
+                success=False, path=md_file, status="failed",
+                skip_reason=str(exc),
+            )
+        results.append(result)
+        rel = str(md_file)
+
+        if result.status == "enriched":
+            n = result.attempts
+            note = f"({n} attempt{'s' if n != 1 else ''})"
+            if n > 1 and result.errors:
+                code = getattr(result.errors[0], "code", "")
+                note = f"({n} attempts — {code} retry)"
+            print(f"{GREEN}✅ {rel:<50} {note}{NC}")
+        elif result.status == "skipped":
+            print(f"{BLUE}⏭  {rel:<50} (skipped — {result.skip_reason}){NC}")
+        elif result.status == "failed":
+            print(f"{RED}❌ {rel:<50} (failed — after {result.attempts} attempts){NC}")
+        elif result.status == "warning":
+            print(f"{YELLOW}⚠️  {rel:<50} (skipped — {result.skip_reason}){NC}")
+
+    print()
+    enriched = sum(1 for r in results if r.status == "enriched")
+    skipped  = sum(1 for r in results if r.status == "skipped")
+    failed   = sum(1 for r in results if r.status == "failed")
+    warned   = sum(1 for r in results if r.status == "warning")
+    info(f"Results: {enriched} enriched, {skipped} skipped, {failed} failed, {warned} warning(s)")
+
+    sys.exit(1 if failed > 0 else 0)
+
+
 # ─── MODELS ───────────────────────────────────────────────────────────────────
 
 
@@ -410,6 +497,16 @@ def main() -> int:
     val.add_argument("--strict", "-s", action="store_true",
                      help="Promote warnings to errors")
 
+    # Enrich command
+    enr = sub.add_parser("enrich", help="Add YAML frontmatter to existing Markdown files")
+    enr.add_argument("path", help="File or directory to enrich")
+    enr.add_argument("--dry-run", action="store_true", help="Print YAML without writing")
+    enr.add_argument("--force", "-f", action="store_true", help="Overwrite valid frontmatter")
+    enr.add_argument("--model", "-m",
+                     choices=["auto", "claude", "gemini", "gpt4", "groq", "grok", "ollama"],
+                     default="auto")
+    enr.add_argument("--output", "-o", help="Output directory (copies, no overwrite)")
+
     # Models command
     models = sub.add_parser("models", help="List available LLM providers")
 
@@ -427,6 +524,8 @@ def main() -> int:
         cmd_generate(args)
     elif args.command == "validate":
         cmd_validate(args)
+    elif args.command == "enrich":
+        cmd_enrich(args)
     elif args.command == "models":
         cmd_models(args)
     elif args.command == "serve":

@@ -273,7 +273,14 @@ class Pipeline:
             taxonomy_domains=cfg.domains,
             today=today,
         )
-        provider = get_provider(model or self.model_name)
+        try:
+            provider = get_provider(model or self.model_name)
+        except Exception as exc:
+            return EnrichResult(
+                success=False, path=file_path, status="failed",
+                skip_reason=str(exc), generation_id=generation_id,
+                existing_fields=existing_field_names,
+            )
         raw_generated = provider.generate(prompt, "")
 
         try:
