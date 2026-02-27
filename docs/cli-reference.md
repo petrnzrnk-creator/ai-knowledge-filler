@@ -7,7 +7,7 @@ status: active
 version: v2.0
 tags: [cli, reference, commands, akf, enrich, validate, generate]
 related:
-  - "[[docs/user-guide]]"
+  - "docs/user-guide.md"
 created: 2026-02-19
 updated: 2026-02-27
 ---

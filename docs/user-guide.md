@@ -7,7 +7,7 @@ status: active
 version: v2.0
 tags: [quickstart, installation, setup, akf, pipeline, validation]
 related:
-  - "[[docs/cli-reference]]"
+  - "docs/cli-reference.md"
 created: 2026-02-19
 updated: 2026-02-27
 ---
