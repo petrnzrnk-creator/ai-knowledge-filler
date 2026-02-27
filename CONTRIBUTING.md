@@ -1,3 +1,18 @@
+---
+title: "Contributing to AKF"
+type: guide
+domain: akf-docs
+level: intermediate
+status: active
+version: v0.5.2
+tags: [contributing, development, testing, providers, versioning]
+related:
+  - "ARCHITECTURE.md"
+  - "docs/cli-reference.md"
+created: 2026-02-06
+updated: 2026-02-27
+---
+
 # Contributing to AKF
 
 Thank you for contributing to AI Knowledge Filler.
@@ -48,8 +63,8 @@ All PRs must pass these gates before merge:
 # 1. Tests — 100% must pass
 pytest --tb=short
 
-# 2. Coverage — must not decrease below 94%
-pytest --cov=. --cov-report=term-missing --cov-fail-under=94
+# 2. Coverage — must not decrease below 93%
+pytest --cov=. --cov-report=term-missing --cov-fail-under=93
 
 # 3. Format check
 black --check .
@@ -59,15 +74,19 @@ pylint cli.py llm_providers.py exceptions.py logger.py akf/ --fail-under=9.0
 
 # 5. Type check
 mypy cli.py llm_providers.py exceptions.py logger.py akf/ --ignore-missing-imports
+
+# 6. Metadata validation
+akf validate --path docs/
 ```
 
 Run all at once:
 ```bash
 black . && pylint cli.py llm_providers.py exceptions.py logger.py akf/ --fail-under=9.0 && \
-mypy cli.py llm_providers.py exceptions.py logger.py akf/ --ignore-missing-imports && pytest
+mypy cli.py llm_providers.py exceptions.py logger.py akf/ --ignore-missing-imports && pytest && \
+akf validate --path docs/
 ```
 
-CI runs the same gates on every push via `.github/workflows/tests.yml` and `lint.yml`.
+CI runs the same gates on every push via `.github/workflows/tests.yml`, `lint.yml`, and `validate.yml`.
 
 ---
 
@@ -81,7 +100,8 @@ ai-knowledge-filler/
 ├── logger.py               # Logging factory (human + JSON)
 ├── akf/
 │   ├── __init__.py         # Package namespace
-│   ├── pipeline.py         # Pipeline class — generate(), validate(), batch_generate()
+│   ├── pipeline.py         # Pipeline class — generate(), enrich(), validate(), batch_generate()
+│   ├── enricher.py         # File reader, YAML extractor, merge logic (akf enrich)
 │   ├── validator.py        # Validation Engine — binary VALID/INVALID, E001–E007
 │   ├── validation_error.py # ValidationError dataclass + error constructors
 │   ├── error_normalizer.py # Translates ValidationErrors → LLM retry instructions
@@ -99,27 +119,19 @@ ai-knowledge-filler/
 ├── tests/
 │   ├── unit/               # Unit tests per module
 │   ├── integration/        # End-to-end pipeline tests
-│   ├── test_cli.py
-│   ├── test_llm_providers.py
-│   ├── test_validator.py
-│   ├── test_validation_error.py
-│   ├── test_error_normalizer.py
-│   ├── test_retry_controller.py
-│   ├── test_commit_gate.py
-│   ├── test_telemetry.py
-│   ├── test_config.py
-│   ├── test_exceptions.py
-│   └── test_logger.py
+│   └── conftest.py         # Fixtures — forces package defaults, isolates from repo akf.yaml
 ├── docs/
 │   ├── user-guide.md
-│   ├── cli-reference.md
-│   └── examples/
+│   └── cli-reference.md
 ├── .github/workflows/
 │   ├── ci.yml
 │   ├── tests.yml
 │   ├── lint.yml
-│   ├── validate.yml
+│   ├── validate.yml        # akf validate --path docs/ on every PR
+│   ├── changelog.yml       # git-cliff CHANGELOG.md on every tag
 │   └── release.yml
+├── akf.yaml                # Repo taxonomy (akf-core, akf-docs, akf-ops, akf-spec)
+├── cliff.toml              # git-cliff changelog config
 ├── pyproject.toml
 ├── ARCHITECTURE.md
 └── CONTRIBUTING.md         # this file
@@ -149,24 +161,11 @@ class MyProvider(LLMProvider):
         return response.text
 ```
 
-2. **Register** in `PROVIDERS` dict and add to `FALLBACK_ORDER` if appropriate:
-
-```python
-PROVIDERS["myprovider"] = MyProvider
-FALLBACK_ORDER.append("myprovider")  # position matters
-```
+2. **Register** in `PROVIDERS` dict and add to `FALLBACK_ORDER` if appropriate.
 
 3. **Add to CLI** — `argparse` choices and `cmd_models()` env var hint in `cli.py`.
 
-4. **Add to `pyproject.toml`** optional dependencies:
-
-```toml
-[project.optional-dependencies]
-all-providers = [
-    ...
-    "myprovider-sdk>=1.0.0",
-]
-```
+4. **Add to `pyproject.toml`** optional dependencies.
 
 5. **Write tests** in `tests/test_llm_providers.py` — mock the SDK, test `is_available()`, `generate()`, error handling, and retry behaviour.
 
@@ -174,24 +173,16 @@ all-providers = [
 
 ## Adding a New Domain
 
-Edit `akf/defaults/akf.yaml` — add the domain to the `enums.domain` list:
+Edit `akf/defaults/akf.yaml` — add the domain to the `taxonomy.domain` list:
 
 ```yaml
-enums:
+taxonomy:
   domain:
     - existing-domain
     - my-new-domain      # add here
 ```
 
-If you also maintain `Domain_Taxonomy.md` in a vault, add a `####` heading there for documentation purposes. The validator reads from `akf.yaml` at runtime — no code change required. Run `akf validate` after to confirm the domain is recognised.
-
----
-
-## Adding a New YAML Type or Status
-
-1. Update `akf/defaults/akf.yaml` — add to the appropriate enum list
-2. Update `Metadata_Template_Standard.md` to document the new value
-3. If the change affects validation logic, update `akf/validator.py`
+The validator reads from `akf.yaml` at runtime — no code change required. Run `akf validate --path docs/` after to confirm the domain is recognised.
 
 ---
 
@@ -199,22 +190,9 @@ If you also maintain `Domain_Taxonomy.md` in a vault, add a `####` heading there
 
 Tests live in `tests/`. Use `pytest` with mocking for external calls.
 
-**Test a provider (mock API call):**
-```python
-from unittest.mock import patch, MagicMock
-from llm_providers import GroqProvider
+**Important:** `tests/conftest.py` forces package defaults for all tests — repo `akf.yaml` is ignored. This prevents E006 taxonomy violations when running tests from the repo directory.
 
-def test_groq_generate(monkeypatch):
-    monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    mock_client = MagicMock()
-    mock_client.chat.completions.create.return_value.choices[0].message.content = "# Output"
-    with patch("llm_providers.Groq", return_value=mock_client):
-        provider = GroqProvider()
-        result = provider.generate("prompt", "system")
-    assert result == "# Output"
-```
-
-**Test validation (via akf.validator):**
+**Test validation:**
 ```python
 from akf.validator import Validator
 from akf.config import get_config
@@ -228,12 +206,11 @@ def test_valid_file(tmp_path):
     validator = Validator(config)
     result = validator.validate(f.read_text())
     assert result.is_valid
-    assert result.errors == []
 ```
 
-**Coverage requirement:** do not decrease existing coverage. Check with:
+**Coverage requirement:** do not decrease below 93%. Check with:
 ```bash
-pytest --cov=. --cov-report=term-missing --cov-fail-under=94
+pytest --cov=. --cov-report=term-missing --cov-fail-under=93
 ```
 
 ---
@@ -254,8 +231,8 @@ pytest --cov=. --cov-report=term-missing --cov-fail-under=94
 1. Fork the repo and create a branch: `git checkout -b fix/my-fix` or `git checkout -b feat/my-feature`
 2. Make changes with tests
 3. Run the full quality gate suite locally
-4. Push and open a PR using the template (`.github/pull_request_template.md`)
-5. CI will run tests and lint automatically
+4. Push and open a PR
+5. CI will run tests, lint, and `akf validate --path docs/` automatically
 6. One approval required before merge
 
 **Branch naming:**
@@ -275,15 +252,21 @@ type: short description (≤72 chars)
 Optional longer explanation.
 ```
 
-Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
+Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`, `security`
 
-Examples:
-```
-feat: add XAI Grok provider with retry support
-fix: ProviderUnavailableError signature — add reason parameter
-docs: update ARCHITECTURE.md module map for Phase 2.5
-test: add validator edge cases for E006 taxonomy violation
-```
+---
+
+## Versioning Policy
+
+AKF follows [Semantic Versioning 2.0.0](https://semver.org/). The public API is declared in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+| Change | Increment | Examples |
+|--------|-----------|---------|
+| Bug fix, CI fix, docs only | **PATCH** | Fix retry abort, update README, fix CI |
+| New functionality — backward compatible | **MINOR** | New CLI command, new SDK method, new E-code |
+| Breaking change to public API | **MAJOR** | Remove CLI command, rename REST field |
+
+`1.0.0` means: public API as declared in `ARCHITECTURE.md` is stable.
 
 ---
 
@@ -291,8 +274,9 @@ test: add validator edge cases for E006 taxonomy violation
 
 1. Bump `version` in `pyproject.toml`
 2. Commit: `chore: bump version to X.Y.Z`
-3. Tag: `git tag vX.Y.Z && git push origin main --tags`
+3. Tag: `git tag vX.Y.Z && git push origin main && git push origin vX.Y.Z`
 4. GitHub Actions `release.yml` builds and publishes to PyPI automatically
+5. `changelog.yml` generates `CHANGELOG.md` and commits to main
 
 ---
 

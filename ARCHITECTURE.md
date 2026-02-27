@@ -1,198 +1,163 @@
+---
+title: "AKF Architecture"
+type: reference
+domain: akf-core
+level: advanced
+status: active
+version: v0.5.2
+tags: [architecture, pipeline, api, public-api, semver, modules]
+related:
+  - "docs/cli-reference.md"
+  - "docs/user-guide.md"
+  - "CONTRIBUTING.md"
+created: 2026-02-06
+updated: 2026-02-27
+---
+
 # AKF Architecture
 
-> AI Knowledge Filler — system overview for contributors and integrators.
+**ai-knowledge-filler** · v0.5.2 · [CHANGELOG](CHANGELOG.md) · [CONTRIBUTING](CONTRIBUTING.md)
 
 ---
 
-## System Overview
+## Public API Declaration
 
-AKF is an **AINCOS — AI-Native Cognitive Operating System**: a deterministic validation pipeline that turns LLM output into schema-compliant, ontology-governed Markdown files.
+This document constitutes the public API declaration required by Semantic Versioning 2.0.0.
 
-The LLM is the **only non-deterministic component**. All other components are pure deterministic functions.
+The public API of `ai-knowledge-filler` consists of three stable interfaces and two contracts. Breaking changes to any element below require a MAJOR version increment. Additions require a MINOR increment. Bug fixes require a PATCH increment.
+
+---
+
+### Interface 1 — CLI
 
 ```
-User Prompt
-    ↓
-cli.py / Pipeline API / REST API    — interface layer
-    ↓
-llm_providers.py                    — provider selection, retry, fallback chain
-    ↓
-LLM API                             — Claude / Gemini / GPT-3.5 / Groq / Grok / Ollama
-    ↓
-Raw Markdown output
-    ↓
-akf/validator.py                    — binary VALID / INVALID + typed error codes (E001–E007)
-    ↓
-akf/error_normalizer.py             — translates errors → structured repair instructions
-    ↓
-akf/retry_controller.py             — max 3 attempts, aborts on identical error hash
-    ↓
-akf/commit_gate.py                  — atomic write, only VALID files reach disk
-    ↓
-akf/telemetry.py                    — append-only JSONL event stream (observe only)
-    ↓
-📄 Output file (validated, schema-compliant)
+akf generate "<prompt>"           Generate a validated .md file
+akf generate "<prompt>" --output  Write to specified path
+akf enrich <path>                 Add YAML frontmatter to existing .md files
+akf enrich <path> --dry-run       Preview only, no writes
+akf enrich <path> --force         Overwrite valid frontmatter
+akf validate <file>               Validate a single file
+akf validate --path <dir>         Validate all .md files in directory
+akf validate <dir> --strict       Validate all .md files; warnings as errors
+akf serve --port <n>              Start REST API server
+akf init                          Scaffold akf.yaml in working directory
+akf models                        List available LLM providers and key status
 ```
 
----
+**Breaking changes (require MAJOR):** removing a command, renaming a command, changing the meaning of an existing flag, changing exit codes.
 
-## Module Map
-
-### Root
-
-| Module | Responsibility | Key public API |
-|--------|---------------|----------------|
-| `cli.py` | Entry point, argument parsing, orchestration | `main()`, `cmd_generate()`, `cmd_validate()`, `cmd_serve()`, `cmd_models()` |
-| `llm_providers.py` | Abstract provider layer, 6 implementations, retry + fallback | `get_provider()`, `list_providers()`, `generate_with_retry()`, `generate_with_fallback()`, `PROVIDERS` |
-| `exceptions.py` | Typed exception hierarchy | `AKFError`, `LLMError`, `ValidationError`, `ConfigError`, `FileError` and subclasses |
-| `logger.py` | Logging configuration — human-readable or JSON | `get_logger()` |
-
-### akf/ package
-
-| Module | Responsibility | Key public API |
-|--------|---------------|----------------|
-| `akf/pipeline.py` | High-level API — orchestrates full generate/validate/batch cycle | `Pipeline.generate()`, `Pipeline.validate()`, `Pipeline.batch_generate()` |
-| `akf/validator.py` | Validation Engine — binary judgment, E001–E007 | `Validator.validate(content) → ValidationResult` |
-| `akf/validation_error.py` | Error contract — typed error dataclass | `ValidationError(code, field, expected, received, severity)` |
-| `akf/error_normalizer.py` | Translates ValidationErrors → LLM repair instructions | `ErrorNormalizer.normalize(errors) → str` |
-| `akf/retry_controller.py` | Convergence protection — aborts on identical error hash | `run_retry_loop(generator, validator, max_attempts=3)` |
-| `akf/commit_gate.py` | Atomic write safety lock | `CommitGate.commit(content, path)` |
-| `akf/telemetry.py` | Append-only JSONL event stream | `TelemetryWriter.record(event: GenerationSummaryEvent)` |
-| `akf/config.py` | Loads `akf.yaml` or defaults | `get_config() → AKFConfig` |
-| `akf/server.py` | FastAPI REST API | `/v1/generate`, `/v1/validate`, `/v1/batch`, `/v1/models`, `/health` |
-| `akf/system_prompt.md` | Bundled LLM instruction set (asset) | loaded by `load_system_prompt()` |
-| `akf/defaults/akf.yaml` | Default taxonomy and enum configuration | consumed by `get_config()` |
-
-### Scripts/
-
-| Module | Responsibility |
-|--------|---------------|
-| `Scripts/validate_yaml.py` | Standalone YAML validator — CLI utility, vault-aware domain loading |
-| `Scripts/analyze_telemetry.py` | Telemetry analysis — retry rates, ontology friction map |
+**Non-breaking additions (MINOR):** new commands, new optional flags.
 
 ---
 
-## Data Flow — Generate Command
-
-```mermaid
-flowchart TD
-    U[akf generate PROMPT] --> CLI[cli.py\ncmd_generate]
-    CLI --> CFG[get_config\nakf.yaml or defaults]
-    CLI --> SP[load_system_prompt\nakf/system_prompt.md]
-    CLI --> GP[get_provider\nname or auto]
-    GP --> FB{Provider\navailable?}
-    FB -->|yes| PROV[LLMProvider.generate\nprompt + system_prompt]
-    FB -->|no — auto| CHAIN[fallback chain\ngroq→grok→claude→gemini→gpt4→ollama]
-    PROV --> RETRY[generate_with_retry\nmax 3 attempts, backoff 1s/2s/4s]
-    RETRY --> LLM[LLM API call]
-    LLM --> RAW[Raw Markdown string]
-    RAW --> VAL[Validator.validate\nbinary VALID/INVALID + E-codes]
-    VAL -->|INVALID| NORM[ErrorNormalizer\nrestructured repair instructions]
-    NORM --> RC[RetryController\nsame error hash? abort]
-    RC -->|retry| LLM
-    RC -->|max attempts| FAIL[❌ Validation failed\ntelemetry recorded]
-    VAL -->|VALID| GATE[CommitGate\natomic write]
-    GATE --> TEL[TelemetryWriter\nappend event to JSONL]
-    TEL --> OUT[📄 Saved file — validated]
-
-    style OUT fill:#27ae60,color:#fff
-    style LLM fill:#3498db,color:#fff
-    style RETRY fill:#e67e22,color:#fff
-    style FAIL fill:#c0392b,color:#fff
-```
-
----
-
-## Pipeline API (Python)
+### Interface 2 — Python SDK
 
 ```python
 from akf import Pipeline
 
-pipeline = Pipeline(output="./vault/")
+# Constructor
+pipeline = Pipeline(
+    output: str | Path,          # vault path
+    config: dict | None = None,  # override akf.yaml
+)
 
-# Single file
-result = pipeline.generate("Create a guide on Docker networking")
-
-# Batch
-results = pipeline.batch_generate([
-    "Guide 1",
-    "Guide 2",
-    "Guide 3",
-])
+# Methods
+pipeline.generate(prompt: str) -> GenerationResult
+pipeline.enrich(path: str | Path, force: bool = False) -> EnrichResult
+pipeline.enrich_dir(path: str | Path, force: bool = False) -> list[EnrichResult]
+pipeline.validate(path: str | Path) -> ValidationResult
+pipeline.batch_generate(prompts: list[str]) -> list[GenerationResult]
 ```
+
+**`GenerationResult`**
+```python
+@dataclass
+class GenerationResult:
+    success: bool
+    file_path: Path | None
+    content: str | None
+    errors: list[ValidationError]
+    attempts: int
+    generation_id: str
+```
+
+**`EnrichResult`**
+```python
+@dataclass
+class EnrichResult:
+    status: str          # "enriched" | "skipped" | "failed" | "warning"
+    file_path: Path
+    errors: list[ValidationError]
+    attempts: int
+    generation_id: str | None
+```
+
+**`ValidationResult`**
+```python
+@dataclass
+class ValidationResult:
+    is_valid: bool
+    errors: list[ValidationError]
+```
+
+**Breaking changes (require MAJOR):** removing a method, renaming a method, changing parameter types, removing fields from result dataclasses, changing field semantics.
 
 ---
 
-## REST API
+### Interface 3 — REST API
 
-`akf serve --port 8000` starts the FastAPI server.
+**Base URL:** `http://host:port`
 
-| Endpoint | Rate limit | Description |
-|----------|-----------|-------------|
-| `GET /health` | — | Always public |
-| `POST /v1/generate` | 10/min | Generate single validated file |
-| `POST /v1/validate` | 30/min | Schema check only |
-| `POST /v1/batch` | 3/min | Generate multiple files |
-| `GET /v1/models` | — | List available providers |
+```
+GET  /health
+     → 200 {"status": "ok"}
 
-Auth is optional by design: no `AKF_API_KEY` → dev mode, all requests pass.
+POST /v1/generate
+     Body: {"prompt": str}
+     → 200 {"success": bool, "content": str, "errors": [...], "generation_id": str}
+     → 422 validation error
+     → 429 rate limit exceeded
+
+POST /v1/enrich
+     Body: {"content": str, "force": bool}
+     → 200 {"status": str, "content": str, "errors": [...]}
+
+POST /v1/validate
+     Body: {"content": str} | {"file_path": str}
+     → 200 {"is_valid": bool, "errors": [...]}
+
+POST /v1/batch
+     Body: {"prompts": [str, ...]}
+     → 200 {"results": [...]}
+
+GET  /v1/models
+     → 200 {"providers": [{"name": str, "available": bool}, ...]}
+
+GET  /docs
+     → Swagger UI
+```
+
+**Auth:** `Authorization: Bearer <AKF_API_KEY>` — required when `AKF_API_KEY` env var is set. If unset, all requests pass (dev mode).
+
+**Rate limits:** `POST /v1/generate` 10/min · `POST /v1/validate` 30/min · `POST /v1/batch` 3/min.
+
+**Breaking changes (require MAJOR):** removing an endpoint, renaming a field in request/response, changing HTTP method, changing response status codes for existing conditions, changing auth model from optional to required unconditionally.
 
 ---
 
-## Provider Layer
-
-### Class Hierarchy
-
-```
-LLMProvider (ABC)
-├── ClaudeProvider       — Anthropic, model: claude-sonnet-4-20250514
-├── GeminiProvider       — Google, model: gemini-3-flash-preview
-├── OpenAIProvider       — OpenAI, model: gpt-3.5-turbo
-├── GroqProvider         — Groq, model: llama-3.3-70b-versatile
-├── XAIProvider          — xAI, model: grok-beta
-└── OllamaProvider       — local, model: $OLLAMA_MODEL (default: llama3.2:3b)
-```
-
-Each provider implements:
-- `generate(prompt, system_prompt) → str`
-- `is_available() → bool`
-- `name`, `display_name`, `model_name` properties
-
-### Provider Registry
+### Contract 1 — ValidationError
 
 ```python
-PROVIDERS: Dict[str, Type[LLMProvider]] = {
-    "claude": ClaudeProvider,
-    "gemini": GeminiProvider,
-    "gpt4":   OpenAIProvider,
-    "groq":   GroqProvider,
-    "grok":   XAIProvider,
-    "ollama": OllamaProvider,
-}
+@dataclass
+class ValidationError:
+    code: str        # E001–E007
+    field: str       # YAML field name
+    expected: Any    # allowed values or type
+    received: Any    # what was found
+    severity: str    # "error" | "warning"
 ```
 
-### Auto-select Priority
-
-```
-FALLBACK_ORDER = ["groq", "grok", "claude", "gemini", "gpt4", "ollama"]
-```
-
-First provider with a valid API key and installed library wins.
-
-### Retry Logic
-
-`generate_with_retry()` wraps every provider call:
-
-- 3 attempts maximum
-- Exponential backoff: 1s → 2s → 4s
-- Retryable signals: timeout, rate limit, 429, 502, 503, connection errors
-- Fatal signals (no retry): 401, 403, invalid API key, 404
-
----
-
-## Validation Pipeline
-
-### Error Codes
+**Error codes:**
 
 | Code | Field | Meaning |
 |------|-------|---------|
@@ -201,178 +166,115 @@ First provider with a valid API key and installed library wins.
 | E003 | created / updated | Date not ISO 8601 |
 | E004 | title / tags | Type mismatch |
 | E005 | frontmatter | General schema violation |
-| E006 | domain | Not in taxonomy |
+| E006 | domain | Not in configured taxonomy |
 | E007 | created / updated | `created > updated` |
 
-### Severity Policy
+**Breaking changes (require MAJOR):** removing an E-code, renaming fields in `ValidationError`, changing severity of an existing code (e.g. warning → error for existing users).
 
-- **Error** → blocks commit → triggers retry
-- **Warning** → logged only → commit proceeds
-
-Warnings never trigger retries. Start strict — easier to downgrade Error→Warning later.
-
-### Retry as Ontology Signal
-
-When `RetryController` aborts on identical `(E-code, field, received_value)` hash, this is **not** model failure — it signals ontology friction. The taxonomy boundary is ambiguous or the vocabulary doesn't match natural language compression. See ADR-001 for the full accountability model.
-
-### Domain Loading
-
-`akf/config.py` loads valid domains from `akf/defaults/akf.yaml` (or user-provided `akf.yaml`). `Scripts/validate_yaml.py` additionally supports vault-aware runtime loading from `Domain_Taxonomy.md`:
-
-1. Search upward from `cwd()` for `Domain_Taxonomy.md`
-2. If not found, `rglob()` the cwd tree
-3. Parse `#### domain-name` headings (regex: `^####\s+([a-z][a-z0-9-]+)\s*$`)
-4. Fall back to `_FALLBACK_DOMAINS` if file not found
+**Non-breaking additions (MINOR):** new E-codes, new `severity` value that does not affect existing behavior.
 
 ---
 
-## Telemetry
-
-`akf/telemetry.py` writes append-only JSONL events. **Telemetry observes — it never influences the pipeline.**
-
-```json
-{
-  "generation_id": "uuid-v4",
-  "document_id": "abc123",
-  "schema_version": "1.0.0",
-  "attempt": 1,
-  "max_attempts": 3,
-  "errors": [
-    {
-      "code": "E006_INVALID_ENUM",
-      "field": "domain",
-      "expected": ["business-strategy", "project-management"],
-      "received": "consulting"
-    }
-  ],
-  "converged": false,
-  "timestamp": "2026-02-21T14:22:01Z",
-  "model": "groq-xyz",
-  "temperature": 0
-}
-```
-
-`Scripts/analyze_telemetry.py` aggregates retry rates per enum value for ontology friction analysis.
-
----
-
-## Configuration
-
-External `akf.yaml` overrides defaults. Example:
+### Contract 2 — akf.yaml Configuration Schema
 
 ```yaml
-schema_version: "1.0.0"
-vault_path: "./vault"
+schema_version: "1.0.0"        # required
+vault_path: "./vault"           # required
 
-enums:
-  type: [concept, guide, reference, checklist, project, roadmap, template, audit]
-  level: [beginner, intermediate, advanced]
-  status: [draft, active, completed, archived]
-  domain:
+taxonomy:
+  domain:                       # domain taxonomy
     - ai-system
     - api-design
-    - devops
-    - security
-    - system-design
+    # ...
+
+enums:
+  type: [concept, guide, ...]   # file type enum
+  level: [beginner, ...]        # level enum
+  status: [draft, active, ...]  # status enum
+```
+
+`schema_version: "1.0.0"` — frozen at this value until a breaking change to the config schema occurs, at which point it increments to `"2.0.0"`.
+
+**Breaking changes (require MAJOR):** renaming a top-level key, removing a key, changing the type of a key, tightening enum sets in a way that invalidates existing configs.
+
+**Non-breaking additions (MINOR):** new optional top-level keys, new enum values.
+
+---
+
+## Pipeline Architecture
+
+```
+Prompt ──► LLM ──► Validation Engine ──► Error Normalizer ──► Retry Controller ──► Commit Gate ──► File
+                          │                      ▲                    │
+                        VALID ───────────────────┼────────────────────┘
+                        INVALID ─────────────────┘         (max 3 attempts;
+                                                            abort on identical
+                                                            error hash)
+```
+
+### Determinism Boundary
+
+| Component | Deterministic | Role |
+|-----------|--------------|------|
+| LLM | ❌ | Content generation — only non-deterministic component |
+| Validation Engine | ✅ | Binary `VALID` / `INVALID` + typed errors |
+| Error Normalizer | ✅ | `ValidationError[]` → LLM repair instructions |
+| Retry Controller | ✅ | Convergence protection — abort on identical hash |
+| Commit Gate | ✅ | Atomic write — only `VALID` output reaches disk |
+| Telemetry Writer | ✅ | Append-only JSONL — observe only, no feedback loop |
+
+---
+
+## Module Map
+
+```
+akf/
+  pipeline.py          Pipeline class — generate(), enrich(), enrich_dir(), validate(), batch_generate()
+  enricher.py          File reader, YAML extractor, merge logic, prompt builder (enrich pipeline)
+  validator.py         Validation Engine
+  validation_error.py  ValidationError dataclass + E001–E007
+  error_normalizer.py  Error → LLM repair instructions
+  retry_controller.py  run_retry_loop() — convergence protection
+  commit_gate.py       Atomic write
+  telemetry.py         TelemetryWriter — append-only JSONL (GenerationEvent + EnrichEvent)
+  config.py            get_config() — loads akf.yaml or defaults
+  server.py            FastAPI REST API
+  defaults/akf.yaml    Default taxonomy + enums
+
+cli.py                 Entry point
+llm_providers.py       Provider router — Claude / Gemini / GPT-4 / Groq / Grok / Ollama
+exceptions.py          Typed exception hierarchy
+logger.py              Logging factory (human + JSON)
+
+Scripts/
+  validate_yaml.py     Standalone YAML frontmatter validator
+  analyze_telemetry.py Telemetry aggregation — retry rate, ontology friction
+
+tests/                 542 tests, 93.74% coverage
+.github/workflows/     ci.yml · tests.yml · lint.yml · validate.yml · changelog.yml · release.yml
 ```
 
 ---
 
-## Exception Hierarchy
+## NOT Public API
 
-```
-AKFError (base)
-├── ValidationError
-│   ├── MissingFieldError(field, filepath)
-│   ├── InvalidFieldValueError(field, value, allowed)
-│   └── InvalidDomainError(domain, suggestion)
-├── LLMError
-│   ├── ProviderUnavailableError(provider)
-│   ├── ProviderTimeoutError(provider, timeout)
-│   └── InvalidResponseError(provider, reason)
-├── ConfigError
-│   ├── MissingConfigError(key)
-│   └── InvalidConfigError
-└── FileError
-    ├── AKFFileNotFoundError(filepath)
-    └── FileParseError(filepath, reason)
-```
+The following are internal and may change without a MAJOR increment:
 
-All exceptions carry a `context: dict` for structured error metadata.
-
----
-
-## Logging
-
-`logger.py` provides a single factory function:
-
-```python
-get_logger(name: str, level: str = "INFO", json_output: bool = False) → Logger
-```
-
-- Default: human-readable format — `%(asctime)s [%(levelname)s] %(name)s: %(message)s`
-- `json_output=True`: structured JSON lines via `JSONFormatter` (timestamp, level, module, message, exception)
-- Each module instantiates its own logger: `logger = get_logger(__name__)`
-
----
-
-## System Prompt
-
-The LLM instruction set lives in `akf/system_prompt.md` and is bundled into the package via `package_data`. `load_system_prompt()` in `cli.py` resolves it:
-
-1. Try `Path(akf.__file__).parent / "system_prompt.md"` (installed package)
-2. Fall back to `Path(__file__).parent / "system_prompt.md"` (local dev)
-
-Note: `system_prompt.md` in the repo root is a copy kept for direct GitHub browsing convenience. The canonical asset is `akf/system_prompt.md`.
-
----
-
-## Extension Points
-
-### Add a new LLM provider
-
-1. Subclass `LLMProvider` in `llm_providers.py`
-2. Implement `generate()`, `is_available()`, `name`, `display_name`, `model_name`
-3. Add to `PROVIDERS` dict and `FALLBACK_ORDER` list
-4. Add env var hint in `cmd_models()` in `cli.py`
-5. Add to `--model` choices in `argparse` setup
-6. Write tests in `tests/test_llm_providers.py`
-
-### Add a new domain
-
-1. Add domain to `enums.domain` list in `akf/defaults/akf.yaml`
-2. `akf/validator.py` picks it up automatically — no code change needed
-3. Optionally document in `Domain_Taxonomy.md` with `####` heading
-
-### Add a new YAML type or status
-
-1. Add to the appropriate enum list in `akf/defaults/akf.yaml`
-2. Update `Metadata_Template_Standard.md` to document the new value
-
----
-
-## Infrastructure Layers
-
-```
-1. Determinism  — Repair Loop (ValidationError + E-codes)        ✅ Done
-2. Contract     — ValidationError dataclass, binary judgment       ✅ Done
-3. Ontology     — Taxonomy enforcement via akf.yaml (E006)        ✅ Done
-4. Governance   — External config, schema evolution               ✅ Done
-5. Interfaces   — Pipeline API + REST API                         ✅ Done
-6. Semantics    — Graph extraction                                Future
-7. Analytics    — Quality scoring layer                           Future
-```
+- `akf/validator.py` internals — `_validate_*` private methods
+- `akf/retry_controller.py` — `_is_identical_error()` hash implementation
+- Telemetry JSONL schema — subject to change until `schema_version: "2.0.0"` is declared stable
+- `Scripts/` — utility scripts, not part of the versioned API
+- `akf/system_prompt.md` — internal LLM instruction set
 
 ---
 
 ## Known Issues
 
-**`gpt4` key maps to GPT-3.5**
-`OpenAIProvider.model_name` returns `gpt-3.5-turbo`. The CLI key `gpt4` is misleading.
-Intentional for backward compatibility — pending upgrade or rename.
-
-**SEC-M2: Path traversal**
-`--output` flag is not sanitised against path traversal. Fix before CI/CD integration use.
-
-**COV-1: pipeline.py 86% coverage**
-`__repr__` and `_load_system_prompt` alternate paths not covered. Low priority.
+| ID | Issue | Severity | Target |
+|----|-------|----------|--------|
+| BUG-1 | `akf generate` from repo directory uses local `akf/` instead of installed package | Medium | v0.6.x |
+| SEC-M2 | `--output` path traversal not sanitized | Medium | v0.6.x |
+| SEC-L2 | `akf init --force` no backup before overwrite | Low | v0.6.x |
+| SEC-L3 | Windows reserved filename check missing | Low | v0.6.x |
+| COV-1 | `pipeline.py` 86% — batch error paths uncovered | Low | v1.0.0 |
+| COV-2 | `validator.py` 92% — legacy `taxonomy_path` branch | Low | v1.0.0 |
