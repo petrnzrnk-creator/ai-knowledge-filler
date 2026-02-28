@@ -4,11 +4,10 @@ AKF Phase 2.1 / ADR-001
 
 Coverage targets:
   - commit: blocks on blocking errors
-  - commit: blocks when schema_version absent
-  - commit: blocks when schema_version mismatches
   - commit: writes atomically when all clear
   - commit: warnings alone do not block
-  - _check_schema_version: absent, mismatch, match
+  - commit: schema_version in document is NOT enforced (ADR-001)
+  - _check_schema_version: absent, mismatch, match (utility function)
   - _extract_schema_version: present, absent, quoted, non-frontmatter
   - _atomic_write: file written, temp file removed
 """
@@ -109,40 +108,34 @@ class TestWarningsDoNotBlock:
         assert result.blocking_errors == []
 
 
-# ── schema_version enforcement ────────────────────────────────────────────────
+# ── schema_version not enforced at commit (ADR-001) ───────────────────────────
 
 class TestSchemaVersionEnforcement:
+    """schema_version in document frontmatter is NOT enforced at commit time.
+    Per ADR-001, schema_version belongs in akf.yaml (config), not in documents."""
 
-    def test_missing_schema_version_blocks_commit(self, tmp_path):
+    def test_missing_schema_version_does_not_block_commit(self, tmp_path):
         out = tmp_path / "out.md"
         result = commit(NO_SCHEMA_DOC, out, [])
-        assert result.committed is False
-        assert not out.exists()
+        assert result.committed is True
+        assert out.exists()
 
-    def test_missing_schema_version_error_has_E005(self, tmp_path):
+    def test_missing_schema_version_no_blocking_errors(self, tmp_path):
         result = commit(NO_SCHEMA_DOC, tmp_path / "out.md", [])
-        assert len(result.blocking_errors) == 1
-        assert result.blocking_errors[0].code == ErrorCode.SCHEMA_VIOLATION
-        assert result.blocking_errors[0].field == "schema_version"
+        assert result.blocking_errors == []
 
-    def test_wrong_schema_version_blocks_commit(self, tmp_path):
+    def test_wrong_schema_version_does_not_block_commit(self, tmp_path):
         out = tmp_path / "out.md"
         result = commit(WRONG_SCHEMA_DOC, out, [])
-        assert result.committed is False
+        assert result.committed is True
 
-    def test_wrong_schema_version_received_matches(self, tmp_path):
+    def test_wrong_schema_version_no_blocking_errors(self, tmp_path):
         result = commit(WRONG_SCHEMA_DOC, tmp_path / "out.md", [])
-        assert result.blocking_errors[0].received == "2.0.0"
+        assert result.blocking_errors == []
 
     def test_correct_schema_version_passes(self, tmp_path):
         out = tmp_path / "out.md"
         result = commit(VALID_DOC, out, [])
-        assert result.committed is True
-
-    def test_custom_expected_schema_version(self, tmp_path):
-        doc = VALID_DOC.replace('"1.0.0"', '"2.0.0"')
-        out = tmp_path / "out.md"
-        result = commit(doc, out, [], expected_schema_version="2.0.0")
         assert result.committed is True
 
 
