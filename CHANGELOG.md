@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to AKF are documented here.
+## [0.5.4] — 2026-02-27
+
+### Documentation
+
+- Update CHANGELOG for v0.5.3 ([`e80ef58`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/e80ef589cb1b715d150de9c0f609695471a435f4))
+
 ## [0.5.3] — 2026-02-27
 
 ### Chores
