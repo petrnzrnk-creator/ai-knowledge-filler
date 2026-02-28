@@ -120,34 +120,10 @@ def commit(
             schema_version=expected_schema_version,
         )
 
-    # 2. Enforce schema_version immutability
-    version_error = _check_schema_version(document, expected_schema_version)
-    if version_error:
-        _emit_summary(
-            writer=writer,
-            generation_id=generation_id,
-            document_id=document_id,
-            schema_version=_schema_ver,
-            total_attempts=total_attempts,
-            converged=False,
-            abort_reason="schema_version_mismatch",
-            rejected_candidates=rejected_candidates or [],
-            final_domain=None,
-            model=model,
-            temperature=temperature,
-            total_duration_ms=total_duration_ms,
-        )
-        return CommitResult(
-            committed=False,
-            path=None,
-            blocking_errors=[version_error],
-            schema_version=expected_schema_version,
-        )
-
-    # 3. Atomic write
+    # 2. Atomic write
     _atomic_write(document, output_path)
 
-    # 4. Emit summary — success
+    # 3. Emit summary — success
     final_domain = _extract_field(document, "domain")
     _emit_summary(
         writer=writer,

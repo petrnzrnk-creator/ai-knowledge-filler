@@ -3,7 +3,7 @@
 Covers:
   - event emitted on successful commit (converged=True, final_domain set)
   - event emitted on blocking errors (converged=False, abort_reason="blocking_errors")
-  - event emitted on schema_version mismatch (abort_reason="schema_version_mismatch")
+  - schema_version in document NOT enforced (ADR-001) — wrong version commits successfully
   - writer=None → no emission, pipeline unaffected
   - generation_id=None → no emission
   - telemetry failure → pipeline continues (observe, never influence)
@@ -188,24 +188,33 @@ class TestSummaryOnBlockingErrors:
         assert not out.exists()
 
 
-# ─── Schema version mismatch path ─────────────────────────────────────────────
+# ─── Schema version in document not enforced (ADR-001) ────────────────────────
 
 class TestSummaryOnSchemaVersionMismatch:
-    def test_emits_summary_on_version_mismatch(self, tmp_path):
+    """schema_version field in document is not enforced at commit time (ADR-001).
+    Documents with any or no schema_version in frontmatter commit successfully."""
+
+    def test_wrong_version_doc_commits_successfully(self, tmp_path):
+        writer = make_writer(tmp_path)
+        result = run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
+        assert result.committed is True
+        assert (tmp_path / "out.md").exists()
+
+    def test_emits_one_summary_on_wrong_version(self, tmp_path):
         writer = make_writer(tmp_path)
         run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
         events = read_events(writer)
         assert len(events) == 1
 
-    def test_converged_false_on_mismatch(self, tmp_path):
+    def test_converged_true_on_wrong_version(self, tmp_path):
         writer = make_writer(tmp_path)
         run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
-        assert read_events(writer)[0]["converged"] is False
+        assert read_events(writer)[0]["converged"] is True
 
-    def test_abort_reason_schema_version_mismatch(self, tmp_path):
+    def test_abort_reason_none_on_wrong_version(self, tmp_path):
         writer = make_writer(tmp_path)
         run_commit(WRONG_VERSION_DOC, tmp_path / "out.md", [], writer)
-        assert read_events(writer)[0]["abort_reason"] == "schema_version_mismatch"
+        assert read_events(writer)[0]["abort_reason"] is None
 
 
 # ─── writer=None and generation_id=None ───────────────────────────────────────
