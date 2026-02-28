@@ -1,11 +1,17 @@
 # Changelog
 
 All notable changes to AKF are documented here.
-## [0.5.4] — 2026-02-27
+## [0.5.4] — 2026-02-28
+
+### Bug Fixes
+
+- Changelog bot pull --rebase before push ([`4960df8`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/4960df830db8e9b21ca7c97891bdae3002220298))
+- Remove schema_version enforcement from commit_gate (BUG-2) ([`e3d2e86`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/e3d2e86713ce6ab78400bfa359ab9cc2212fe32d))
 
 ### Documentation
 
 - Update CHANGELOG for v0.5.3 ([`e80ef58`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/e80ef589cb1b715d150de9c0f609695471a435f4))
+- Update CHANGELOG for v0.5.4 ([`bf2040d`](https://github.com/petrnzrnk-creator/ai-knowledge-filler/commit/bf2040da739d3473cd494c0b4734dd9c8edc14bb))
 
 ## [0.5.3] — 2026-02-27
 
